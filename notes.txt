@@ -1,0 +1,7 @@
+Compile fb.c:
+    OSX: clang -framework Cocoa fb.c -o fb
+
+Compile fb.m:
+    clang -fobjc-arc -framework Cocoa fb.m -o fb
+
+gcc -x objective-c fb.c
