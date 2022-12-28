@@ -1,16 +1,13 @@
-if [ "$#" -ne 2 ]; then
-    echo "Usage: ./build_macos.sh <input obj-c file> <output app name>"
-    exit
-fi
-mkdir $2.app
-mkdir $2.app/Contents
-mkdir $2.app/Contents/MacOS
-clang -framework Cocoa -x objective-c -Os $1 -o $2.app/Contents/MacOS/$2
+n = "dtmnChess"
+mkdir $n.app
+mkdir $n.app/Contents
+mkdir $n.app/Contents/MacOS
+clang -framework Cocoa -x objective-c -Os main.c -o $n.app/Contents/MacOS/$n
 echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <plist version=\"1.0\">
 <dict>
 	<key>CFBundleExecutable</key>
-	<string>$2</string>
+	<string>$n</string>
 </dict>
 </plist>
-" > $2.app/Contents/Info.plist
+" > $n.app/Contents/Info.plist
