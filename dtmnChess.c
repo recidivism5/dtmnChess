@@ -127,14 +127,11 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     CGImageRelease(img);
 }
 #pragma mark NSTextInputClient
-// Invokes the action specified by the given selector.
 - (void)doCommandBySelector:(nonnull SEL)selector {
 }
-// Returns an attributed string derived from the given range in the receiver's text storage.
 - (nullable NSAttributedString *)attributedSubstringForProposedRange:(NSRange)range actualRange:(nullable NSRangePointer)actualRange {
     return nil;
 }
-// Inserts the given string into the receiver, replacing the specified content.
 - (void)insertText:(nonnull id)string replacementRange:(NSRange)replacementRange {
     NSString    *characters;
     NSUInteger  codepoint;
@@ -150,7 +147,7 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
         if ([characters getBytes:&codepoint
             maxLength:sizeof(codepoint)
             usedLength:NULL
-            encoding:NSUTF32StringEncoding // NSUTF8StringEncoding
+            encoding:NSUTF32StringEncoding
             options:0
             range:range
             remainingRange:&range]) {
@@ -162,35 +159,26 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
         }
     }
 }
-// Returns the index of the character whose bounding rectangle includes the given point.
 - (NSUInteger)characterIndexForPoint:(NSPoint)point {
     return 0;
 }
-// Returns the first logical boundary rectangle for characters in the given range.
 - (NSRect)firstRectForCharacterRange:(NSRange)range actualRange:(nullable NSRangePointer)actualRange {
     return NSMakeRect(0.0, 0.0, 0.0, 0.0);
 }
-// [Handling Marked Text]
 static const NSRange kEmptyRange = { NSNotFound, 0 };
-// Returns a Boolean value indicating whether the receiver has marked text.
 - (BOOL)hasMarkedText {
     return false;
 }
-// Returns the range of the marked text.
 - (NSRange)markedRange {
     return kEmptyRange;
 }
-// Returns the range of selected text.
 - (NSRange)selectedRange {
     return kEmptyRange;
 }
-// Replaces a specified range in the receiver�s text storage with the given string and sets the selection.
 - (void)setMarkedText:(nonnull id)string selectedRange:(NSRange)selectedRange replacementRange:(NSRange)replacementRange {
 }
-// Unmarks the marked text.
 - (void)unmarkText {
 }
-// Returns an array of attribute names recognized by the receiver.
 - (nonnull NSArray<NSString *> *)validAttributesForMarkedText {
     return [NSArray array];
 }
@@ -236,9 +224,6 @@ defer:(BOOL)deferCreation
     exit(0);
 }
 - (void)keyDown:(NSEvent *)event {
-    //short int key_code = g_keycodes[[event keyCode] & 0x1ff];
-    //window_data->key_status[key_code] = true;
-    //kCall(keyboard_func, key_code, window_data->mod_keys, true);
     [self.contentView interpretKeyEvents:@[event]];
 }
 @end
