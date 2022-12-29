@@ -6,7 +6,7 @@ typedef int32_t i32;
 #define BACKGROUND_COLOR 0x0000ff
 #define START_WIDTH 640
 #define START_HEIGHT 480
-i32 fbWidth = START_WIDTH, fbHeight = START_HEIGHT;
+i32 fbWidth = 128, fbHeight = 128;
 i32 fbPixelCount = START_WIDTH*START_HEIGHT;
 u32 *frameBuffer;
 char title[] = "swag";
@@ -37,7 +37,7 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         }
         return DefWindowProc(hwnd, msg, wparam, lparam);
     }
-    case WM_SIZE: {
+    /*case WM_SIZE: {
         int width = LOWORD(lparam);
         int height = HIWORD(lparam);
         if ((width != fbWidth) || (height != fbHeight)){
@@ -53,7 +53,7 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
             draw();
         }
         return 0;
-    }
+    }*/
     case WM_PAINT:
         bmi.bmiHeader.biWidth = fbWidth;
         bmi.bmiHeader.biHeight = -fbHeight;
@@ -70,15 +70,6 @@ WNDCLASSA wc = {0,WindowProc,0,0,NULL,NULL,NULL,NULL,NULL,title};
 HWND wnd;
 MSG msg;
 int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int nCmdShow){
-    frameBuffer = malloc(fbPixelCount*4);
-    draw();
-    wc.hInstance = hCurrentInst;
-    wc.hIcon = LoadIconA(0,IDI_APPLICATION);
-    wc.hCursor = LoadCursorA(0,IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)CreateSolidBrush(BACKGROUND_COLOR);
-    RegisterClassA(&wc);
-    wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,16,16,fbWidth,fbHeight,NULL,NULL,wc.hInstance,NULL);
-    hdc = GetDC(wnd);
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
@@ -88,6 +79,15 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     bmi.bmiColors[0].rgbRed = 0xff;
     bmi.bmiColors[1].rgbGreen = 0xff;
     bmi.bmiColors[2].rgbBlue = 0xff;
+    frameBuffer = malloc(fbPixelCount*4);
+    draw();
+    wc.hInstance = hCurrentInst;
+    wc.hIcon = LoadIconA(0,IDI_APPLICATION);
+    wc.hCursor = LoadCursorA(0,IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)CreateSolidBrush(BACKGROUND_COLOR);
+    RegisterClassA(&wc);
+    wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,16,16,START_WIDTH,START_HEIGHT,NULL,NULL,wc.hInstance,NULL);
+    hdc = GetDC(wnd);
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
