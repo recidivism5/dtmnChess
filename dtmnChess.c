@@ -231,21 +231,6 @@ defer:(BOOL)deferCreation
 
 id applicationName;
 id window;
-static void update_events(){
-    NSEvent* event;
-    @autoreleasepool {
-        do {
-            event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
-            if (event) {
-                [NSApp sendEvent:event];
-            }
-        } while (event);
-    }
-}
-void update(){
-    update_events();
-    [[window contentView] setNeedsDisplay:YES];
-}
 int main(){
     draw();
     @autoreleasepool{
@@ -262,7 +247,16 @@ int main(){
     [window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
     while (1){
-        update();
+        NSEvent* event;
+        @autoreleasepool {
+            do {
+                event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+                if (event) {
+                    [NSApp sendEvent:event];
+                }
+            } while (event);
+        }
+        [[window contentView] setNeedsDisplay:YES];
         //usleep(1000);
     }
     }
