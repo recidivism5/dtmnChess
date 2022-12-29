@@ -54,10 +54,6 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         }
         return 0;
     }*/
-    case WM_PAINT:
-        StretchDIBits(hdc, 0,0, WIDTH,HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
-        ValidateRect(hwnd, 0);
-        return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
@@ -88,8 +84,7 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
-        InvalidateRect(wnd, 0, TRUE);
-        SendMessage(wnd, WM_PAINT, 0, 0);
+        StretchDIBits(hdc, 0,0, WIDTH,HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
     }
     return msg.wParam;
 }
