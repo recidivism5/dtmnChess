@@ -117,14 +117,14 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
     CGDataProviderRef provider = CGDataProviderCreateWithData(0x0,
         frameBuffer,
-        fbPixelCount*4,
+        sizeof(frameBuffer),
         0x0
     );
-    CGImageRef img = CGImageCreate(fbWidth
-        , fbHeight
+    CGImageRef img = CGImageCreate(WIDTH
+        , HEIGHT
         , 8
         , 32
-        , fbWidth * 4
+        , WIDTH * 4
         , space
         , kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little
         , provider
@@ -135,7 +135,7 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     CGColorSpaceRelease(space);
     CGDataProviderRelease(provider);
     CGContextDrawImage(context,
-        CGRectMake(0, 0, fbWidth, fbHeight),
+        CGRectMake(0, 0, WND_WIDTH, WND_HEIGHT),
         img
     );
     CGImageRelease(img);
@@ -221,19 +221,6 @@ defer:(BOOL)deferCreation
     }
     return self;
 }
-- (void)windowDidResize:(NSNotification *)notification {
-    CGSize size = [self contentRectForFrameRect:[self frame]].size;
-    fbWidth = (int)size.width;
-    fbHeight = (int)size.height;
-    if (fbWidth*fbHeight > fbPixelCount){
-        while (fbWidth*fbHeight > fbPixelCount){
-            fbPixelCount *= 2;
-        }
-        free(frameBuffer);
-        frameBuffer = malloc(fbPixelCount*4);
-    }
-    draw();
-}
 - (BOOL)windowShouldClose:(NSWindow *) wnd {
     exit(0);
 }
@@ -260,14 +247,13 @@ void update(){
     [[window contentView] setNeedsDisplay:YES];
 }
 int main(){
-    frameBuffer = malloc(fbPixelCount*4);
     draw();
     @autoreleasepool{
         [NSApplication sharedApplication];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     applicationName = [[NSProcessInfo processInfo] processName];
-    window = [[FBWindow alloc] initWithContentRect:NSMakeRect(0, 0, fbWidth, fbHeight)
-        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskResizable|NSWindowStyleMaskMiniaturizable
+    window = [[FBWindow alloc] initWithContentRect:NSMakeRect(0, 0, WND_WIDTH, WND_HEIGHT)
+        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable
         backing:NSBackingStoreBuffered defer:NO];
     [window center];
     [window setTitle: applicationName];

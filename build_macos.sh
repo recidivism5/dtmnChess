@@ -1,4 +1,4 @@
-n = "dtmnChess"
+n="dtmnChess"
 mkdir $n.app
 mkdir $n.app/Contents
 mkdir $n.app/Contents/MacOS
