@@ -4,10 +4,11 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef int32_t i32;
 #define BACKGROUND_COLOR 0x0000ff
-#define START_WIDTH 640
-#define START_HEIGHT 480
 #define WIDTH 128
 #define HEIGHT 128
+#define SCALE 4
+#define WND_WIDTH (SCALE*WIDTH)
+#define WND_HEIGHT (SCALE*HEIGHT)
 u32 frameBuffer[WIDTH*HEIGHT];
 char title[] = "swag";
 void draw(void);
@@ -37,23 +38,6 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         }
         return DefWindowProc(hwnd, msg, wparam, lparam);
     }
-    /*case WM_SIZE: {
-        int width = LOWORD(lparam);
-        int height = HIWORD(lparam);
-        if ((width != fbWidth) || (height != fbHeight)){
-            fbWidth = LOWORD(lparam);
-            fbHeight = HIWORD(lparam);
-            if (fbWidth*fbHeight > fbPixelCount){
-                while (fbWidth*fbHeight > fbPixelCount){
-                    fbPixelCount *= 2;
-                }
-                free(frameBuffer);
-                frameBuffer = malloc(fbPixelCount*4);
-            }
-            draw();
-        }
-        return 0;
-    }*/
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
@@ -63,6 +47,7 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
 WNDCLASSA wc = {0,WindowProc,0,0,NULL,NULL,NULL,NULL,NULL,title};
 HWND wnd;
 MSG msg;
+RECT wr;
 int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int nCmdShow){
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmi.bmiHeader.biPlanes = 1;
@@ -79,12 +64,15 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     wc.hCursor = LoadCursorA(0,IDC_ARROW);
     wc.hbrBackground = (HBRUSH)CreateSolidBrush(BACKGROUND_COLOR);
     RegisterClassA(&wc);
-    wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,16,16,START_WIDTH,START_HEIGHT,NULL,NULL,wc.hInstance,NULL);
+    wr.right = WND_WIDTH;
+    wr.bottom = WND_HEIGHT;
+    AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+    wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
     hdc = GetDC(wnd);
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
-        StretchDIBits(hdc, 0,0, WIDTH*2,HEIGHT*2, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
+        StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
     }
     return msg.wParam;
 }
