@@ -6,9 +6,9 @@ typedef int32_t i32;
 #define BACKGROUND_COLOR 0x0000ff
 #define START_WIDTH 640
 #define START_HEIGHT 480
-i32 fbWidth = 128, fbHeight = 128;
-i32 fbPixelCount = START_WIDTH*START_HEIGHT;
-u32 *frameBuffer;
+#define WIDTH 128
+#define HEIGHT 128
+u32 frameBuffer[WIDTH*HEIGHT];
 char title[] = "swag";
 void draw(void);
 void char_input(char c);
@@ -55,9 +55,7 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         return 0;
     }*/
     case WM_PAINT:
-        bmi.bmiHeader.biWidth = fbWidth;
-        bmi.bmiHeader.biHeight = -fbHeight;
-        StretchDIBits(hdc, 0,0, fbWidth,fbHeight, 0,0,fbWidth,fbHeight,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
+        StretchDIBits(hdc, 0,0, WIDTH,HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
         ValidateRect(hwnd, 0);
         return 0;
     case WM_DESTROY:
@@ -74,12 +72,11 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
     bmi.bmiHeader.biCompression = BI_BITFIELDS;
-    bmi.bmiHeader.biWidth = fbWidth;
-    bmi.bmiHeader.biHeight = -fbHeight;
+    bmi.bmiHeader.biWidth = WIDTH;
+    bmi.bmiHeader.biHeight = -HEIGHT;
     bmi.bmiColors[0].rgbRed = 0xff;
     bmi.bmiColors[1].rgbGreen = 0xff;
     bmi.bmiColors[2].rgbBlue = 0xff;
-    frameBuffer = malloc(fbPixelCount*4);
     draw();
     wc.hInstance = hCurrentInst;
     wc.hIcon = LoadIconA(0,IDI_APPLICATION);
@@ -287,7 +284,7 @@ void draw_char(char c){
     for (i = 0; i < 6; i++){
         col = font[6*(c - 32) + i];
         for (j = 0; j < 8; j++){
-            frameBuffer[(g_y+j)*fbWidth + g_x] = col & (1<<j) ? WHITE : 0;
+            frameBuffer[(g_y+j)*WIDTH + g_x] = col & (1<<j) ? WHITE : 0;
         }
         g_x++;
     }
@@ -309,7 +306,7 @@ void draw_string(int x, int y, char *str){
         for (i = 0; i < 6; i++){
             col = font[6*(*str - 32) + i];
             for (j = 0; j < 8; j++){
-                frameBuffer[(y+j)*fbWidth + x] = col & (1<<j) ? WHITE : 0;
+                frameBuffer[(y+j)*HEIGHT + x] = col & (1<<j) ? WHITE : 0;
             }
             x++;
         }
@@ -317,12 +314,9 @@ void draw_string(int x, int y, char *str){
     }
 }
 void draw(){
-    for (int i = 0; i < fbPixelCount; i++){
-        frameBuffer[i] = 0;
-    }
     for (int y = 0; y < 16; y++){
         for (int x = 0; x < 16; x++){
-            frameBuffer[y*fbWidth + x] = pawn[y] & (1<<x) ? WHITE : 0;
+            frameBuffer[y*WIDTH + x] = pawn[y] & (1<<x) ? WHITE : 0;
         }
     }
 }
