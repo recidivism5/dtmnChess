@@ -3,6 +3,8 @@
 <dict>
 	<key>CFBundleExecutable</key>
 	<string>dtmnChess</string>
+	<key>NSHighResolutionCapable</key>
+	<string>True</string>
 </dict>
 </plist>
 

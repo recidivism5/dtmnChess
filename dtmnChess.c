@@ -114,6 +114,7 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
 @implementation FBView
 - (void)drawRect:(NSRect)rect {
     CGContextRef context = [[NSGraphicsContext currentContext] CGContext];
+    CGContextSetInterpolationQuality(context, 1);
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
     CGDataProviderRef provider = CGDataProviderCreateWithData(0x0,
         frameBuffer,

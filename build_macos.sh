@@ -8,6 +8,8 @@ echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <dict>
 	<key>CFBundleExecutable</key>
 	<string>$n</string>
+	<key>NSHighResolutionCapable</key>
+	<string>True</string>
 </dict>
 </plist>
 " > $n.app/Contents/Info.plist
