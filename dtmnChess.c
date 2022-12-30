@@ -4,8 +4,10 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef int32_t i32;
 #define BACKGROUND_COLOR 0x0000ff
-#define WIDTH 128
-#define HEIGHT 128
+#define PIECE_WIDTH 16
+#define SQUARE_WIDTH 20
+#define WIDTH (SQUARE_WIDTH*8 + SQUARE_WIDTH*2)
+#define HEIGHT (SQUARE_WIDTH*8)
 #define SCALE 4
 #define WND_WIDTH (SCALE*WIDTH)
 #define WND_HEIGHT (SCALE*HEIGHT)
@@ -19,7 +21,8 @@ u16 knight[]={0x00,0x20,0x60,0x3F0,0xFF8,0xFD8,0x1FFC,0x1FFE,0x1E7E,0x1E2E,0x1F0
 u16 queen[]={0x00,0x00,0x420,0xE70,0x420,0x660,0x27E4,0x77EE,0x27E4,0x3FFC,0x1FF8,0x1FF8,0xFF0,0x7E0,0x3FFC,0x3FFC,};
 u16 king[]={0x00,0x180,0x180,0x7E0,0x7E0,0x180,0xDB0,0x1BD8,0x318C,0x318C,0x318C,0x1998,0xDB0,0xFF0,0x3FFC,0x3FFC,};
 #define WHITE 0x00ffffff
-#define GREEN 0x0000ff00
+#define BOARD_GREEN 0x00006400
+#define BOARD_WHITE 0x00b4b4b4
 void draw_string(int x, int y, char *str){
     char col;
     int i,j;
@@ -34,17 +37,23 @@ void draw_string(int x, int y, char *str){
         str++;
     }
 }
-drawPiece(u16 *piece, int x, int y){
-    for (int j = 0; j < 16; j++){
-        for (int i = 0; i < 16; i++){
-            frameBuffer[(y+j)*WIDTH + x+i] = piece[j] & (1<<i) ? WHITE : 0;
-        }
-    }
+void drawSquare(int x, int y, u32 color){
+     for (int j = 0; j < SQUARE_WIDTH; j++)
+        for (int i = 0; i < SQUARE_WIDTH; i++)
+            frameBuffer[(y+j)*WIDTH + x+i] = color;
+}
+void drawPiece(u16 *piece, int x, int y){
+    for (int j = 0; j < PIECE_WIDTH; j++)
+        for (int i = 0; i < PIECE_WIDTH; i++)
+            if (piece[j] & (1<<i)) frameBuffer[(y+j)*WIDTH + x+i] = WHITE;
 }
 void draw(){
-    for (int y = 0; y < 8; y++)
-        for (int x = 0; x < 8; x++)
-            drawPiece(king, x*16, y*16);
+    for (int y = 0; y < 8; y++){
+        for (int x = 0; x < 8; x++){
+            drawSquare(x*SQUARE_WIDTH,y*SQUARE_WIDTH, (x%2)^(y%2) ? BOARD_GREEN : BOARD_WHITE);
+            drawPiece(king, x*SQUARE_WIDTH+(SQUARE_WIDTH-PIECE_WIDTH)/2, y*SQUARE_WIDTH+(SQUARE_WIDTH-PIECE_WIDTH)/2);
+        }
+    }
 }
 void char_input(char c){
 
