@@ -34,12 +34,17 @@ void draw_string(int x, int y, char *str){
         str++;
     }
 }
-void draw(){
-    for (int y = 0; y < 16; y++){
-        for (int x = 0; x < 16; x++){
-            frameBuffer[y*WIDTH + x] = pawn[y] & (1<<x) ? WHITE : 0;
+drawPiece(u16 *piece, int x, int y){
+    for (int j = 0; j < 16; j++){
+        for (int i = 0; i < 16; i++){
+            frameBuffer[(y+j)*WIDTH + x+i] = piece[j] & (1<<i) ? WHITE : 0;
         }
     }
+}
+void draw(){
+    for (int y = 0; y < 8; y++)
+        for (int x = 0; x < 8; x++)
+            drawPiece(king, x*16, y*16);
 }
 void char_input(char c){
 
