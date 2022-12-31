@@ -4,9 +4,10 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef int32_t i32;
+typedef int bool;
 #define BACKGROUND_COLOR 0x0000ff
 #define WHITE 0x00ffffff
-#define BLACK 0x00990000
+#define RED 0x00990000
 #define SHADOW 0
 #define BOARD_GREEN 0x00006400
 #define BOARD_WHITE 0x00b4b4b4
@@ -40,31 +41,32 @@ u16 queen[]={0x00,0x00,0x420,0xE70,0x420,0x660,0x27E4,0x77EE,0x27E4,0x3FFC,0x1FF
 u16 king[]={0x00,0x180,0x180,0x7E0,0x7E0,0x180,0xDB0,0x1BD8,0x318C,0x318C,0x318C,0x1998,0xDB0,0xFF0,0x3FFC,0x3FFC,};
 typedef struct Cell {
     u16 *piece;
-    u32 color;
+    bool side;
 }Cell;
 Cell board[8*8];
 #define AT(x,y) ((y)*8 + (x))
-u32 side = WHITE;
-void setCell(int x, int y, u16 *piece, u32 color){
+bool side = 0;
+u32 pieceColors[2] = {WHITE, RED};
+void setCell(int x, int y, u16 *piece, bool side){
     board[y*8 + x].piece = piece;
-    board[y*8 + x].color = color;
+    board[y*8 + x].side = side;
 }
-void setRow(int y, u32 color){
-    setCell(0,y, rook, color);
-    setCell(1,y, knight, color);
-    setCell(2,y, bishop, color);
-    setCell(3,y, queen, color);
-    setCell(4,y, king, color);
-    setCell(5,y, bishop, color);
-    setCell(6,y, knight, color);
-    setCell(7,y, rook, color);
+void setRow(int y, bool side){
+    setCell(0,y, rook, side);
+    setCell(1,y, knight, side);
+    setCell(2,y, bishop, side);
+    setCell(3,y, queen, side);
+    setCell(4,y, king, side);
+    setCell(5,y, bishop, side);
+    setCell(6,y, knight, side);
+    setCell(7,y, rook, side);
 }
 void setBoard(){
-    setRow(0, WHITE);
-    setRow(7, BLACK);
+    setRow(0, 0);
+    setRow(7, 1);
     for (int x = 0; x < 8; x++){
-        setCell(x, 1, pawn, WHITE);
-        setCell(x, 6, pawn, BLACK);
+        setCell(x, 1, pawn, 0);
+        setCell(x, 6, pawn, 1);
     }
 }
 void drawSquare(int x, int y, u32 color){
@@ -88,16 +90,19 @@ void init(){
 }
 char mousePos[32];
 void mouseLeftDown(int x, int y){
-    sprintf(mousePos, "%d,%d", x/CELL_WIDTH, 7-y/CELL_WIDTH);
+    sprintf(mousePos, "%d,%d", side ? 7-x/CELL_WIDTH : x/CELL_WIDTH, side ? y/CELL_WIDTH : 7-y/CELL_WIDTH);
+}
+void mouseRightDown(int x, int y){
+    side = !side;
 }
 void draw(){
     for (int y = 0; y < 8; y++){
         for (int x = 0; x < 8; x++){
-            int scrY = side==BLACK ? y : 7-y,
-                scrX = side==BLACK ? 7-x : x;
+            int scrY = side ? y : 7-y,
+                scrX = side ? 7-x : x;
             drawSquare(scrX*CELL_WIDTH,scrY*CELL_WIDTH, (scrX%2)^(scrY%2) ? BOARD_GREEN : BOARD_WHITE);
             Cell c = board[AT(x,y)];
-            if (c.piece) drawPieceOnCell(c.piece, c.color, scrX, scrY);
+            if (c.piece) drawPieceOnCell(c.piece, pieceColors[c.side], scrX, scrY);
         }
     }
     drawString(0,0, mousePos);
@@ -134,6 +139,9 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
     }
     case WM_LBUTTONDOWN:
         mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
+        return 0;
+    case WM_RBUTTONDOWN:
+        mouseRightDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
         return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
