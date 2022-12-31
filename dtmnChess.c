@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdint.h>
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -10,9 +11,9 @@ typedef int32_t i32;
 #define BOARD_GREEN 0x00006400
 #define BOARD_WHITE 0x00b4b4b4
 #define PIECE_WIDTH 16
-#define SQUARE_WIDTH 20
-#define WIDTH (SQUARE_WIDTH*8)
-#define HEIGHT (SQUARE_WIDTH*8)
+#define CELL_WIDTH 20
+#define WIDTH (CELL_WIDTH*8)
+#define HEIGHT (CELL_WIDTH*8)
 #define SCALE 4
 #define WND_WIDTH (SCALE*WIDTH)
 #define WND_HEIGHT (SCALE*HEIGHT)
@@ -25,9 +26,7 @@ void drawString(int x, int y, char *str){
     while (*str){
         for (i = 0; i < 6; i++){
             col = font[6*(*str - 32) + i];
-            for (j = 0; j < 8; j++){
-                frameBuffer[(y+j)*HEIGHT + x] = col & (1<<j) ? WHITE : 0;
-            }
+            for (j = 0; j < 8; j++) if (col & (1<<j)) frameBuffer[(y+j)*HEIGHT + x] = WHITE;
             x++;
         }
         str++;
@@ -69,8 +68,8 @@ void setBoard(){
     }
 }
 void drawSquare(int x, int y, u32 color){
-     for (int j = 0; j < SQUARE_WIDTH; j++)
-        for (int i = 0; i < SQUARE_WIDTH; i++)
+     for (int j = 0; j < CELL_WIDTH; j++)
+        for (int i = 0; i < CELL_WIDTH; i++)
             frameBuffer[(y+j)*WIDTH + x+i] = color;
 }
 void drawPiece(u16 *piece, u32 color, int x, int y){
@@ -82,28 +81,35 @@ void drawPiece(u16 *piece, u32 color, int x, int y){
             }
 }
 void drawPieceOnCell(u16 *piece, u32 color, int x, int y){
-    drawPiece(piece, color, x*SQUARE_WIDTH+(SQUARE_WIDTH-PIECE_WIDTH)/2, y*SQUARE_WIDTH+(SQUARE_WIDTH-PIECE_WIDTH)/2);
+    drawPiece(piece, color, x*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, y*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
 }
 void init(){
     setBoard();
+}
+char mousePos[32];
+void mouseLeftDown(int x, int y){
+    sprintf(mousePos, "%d,%d", x/CELL_WIDTH, 7-y/CELL_WIDTH);
 }
 void draw(){
     for (int y = 0; y < 8; y++){
         for (int x = 0; x < 8; x++){
             int scrY = side==BLACK ? y : 7-y,
                 scrX = side==BLACK ? 7-x : x;
-            drawSquare(scrX*SQUARE_WIDTH,scrY*SQUARE_WIDTH, (scrX%2)^(scrY%2) ? BOARD_GREEN : BOARD_WHITE);
+            drawSquare(scrX*CELL_WIDTH,scrY*CELL_WIDTH, (scrX%2)^(scrY%2) ? BOARD_GREEN : BOARD_WHITE);
             Cell c = board[AT(x,y)];
             if (c.piece) drawPieceOnCell(c.piece, c.color, scrX, scrY);
         }
     }
+    drawString(0,0, mousePos);
 }
-void char_input(char c){
+void charInput(char c){
 
 }
 #if _WIN32
 #include <windows.h>
 #include <dwmapi.h>
+#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
+#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 struct BMI {
     BITMAPINFOHEADER    bmiHeader;
@@ -126,6 +132,9 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         }
         return DefWindowProc(hwnd, msg, wparam, lparam);
     }
+    case WM_LBUTTONDOWN:
+        mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
+        return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
@@ -147,7 +156,6 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     bmi.bmiColors[1].rgbGreen = 0xff;
     bmi.bmiColors[2].rgbBlue = 0xff;
     init();
-    draw();
     wc.hInstance = hCurrentInst;
     wc.hIcon = LoadIconA(0,IDI_APPLICATION);
     wc.hCursor = LoadCursorA(0,IDC_ARROW);
@@ -161,6 +169,7 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
+        draw();
         StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
     }
     return msg.wParam;
@@ -228,7 +237,7 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
             if ((codepoint & 0xff00) == 0xf700)
                 continue;
 
-            char_input((char)codepoint);
+            charInput((char)codepoint);
         }
     }
 }
