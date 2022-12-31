@@ -5,7 +5,7 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef int32_t i32;
 typedef int bool;
-#define BACKGROUND_COLOR 0x0000ff
+#define BACKGROUND_COLOR 0
 #define WHITE 0x00ffffff
 #define RED 0x00990000
 #define SHADOW 0
@@ -90,7 +90,10 @@ void init(){
 }
 char mousePos[32];
 void mouseLeftDown(int x, int y){
-    sprintf(mousePos, "%d,%d", side ? 7-x/CELL_WIDTH : x/CELL_WIDTH, side ? y/CELL_WIDTH : 7-y/CELL_WIDTH);
+    int cx = side ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
+        cy = side ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
+    
+    sprintf(mousePos, "%d,%d", cx, cy);
 }
 void mouseRightDown(int x, int y){
     side = !side;
@@ -121,6 +124,7 @@ struct BMI {
     RGBQUAD             bmiColors[3];
 } bmi;
 HDC hdc;
+#define UPDATE draw(); StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
 LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
     BOOL t = TRUE;
     switch (msg){
@@ -139,9 +143,11 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
     }
     case WM_LBUTTONDOWN:
         mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
+        UPDATE
         return 0;
     case WM_RBUTTONDOWN:
         mouseRightDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
+        UPDATE
         return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -174,11 +180,10 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
     wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
     hdc = GetDC(wnd);
+    UPDATE
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
-        draw();
-        StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
     }
     return msg.wParam;
 }
