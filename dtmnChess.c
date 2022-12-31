@@ -5,7 +5,8 @@ typedef uint32_t u32;
 typedef int32_t i32;
 #define BACKGROUND_COLOR 0x0000ff
 #define WHITE 0x00ffffff
-#define BLACK 0
+#define BLACK 0x00990000
+#define SHADOW 0
 #define BOARD_GREEN 0x00006400
 #define BOARD_WHITE 0x00b4b4b4
 #define PIECE_WIDTH 16
@@ -75,7 +76,10 @@ void drawSquare(int x, int y, u32 color){
 void drawPiece(u16 *piece, u32 color, int x, int y){
     for (int j = 0; j < PIECE_WIDTH; j++)
         for (int i = 0; i < PIECE_WIDTH; i++)
-            if (piece[j] & (1<<i)) frameBuffer[(y+j)*WIDTH + x+i] = color;
+            if (piece[j] & (1<<i)){
+                frameBuffer[(y+j)*WIDTH + x+i] = color;
+                frameBuffer[(y+j+1)*WIDTH + x+i+1] = SHADOW;
+            }
 }
 void drawPieceOnCell(u16 *piece, u32 color, int x, int y){
     drawPiece(piece, color, x*SQUARE_WIDTH+(SQUARE_WIDTH-PIECE_WIDTH)/2, y*SQUARE_WIDTH+(SQUARE_WIDTH-PIECE_WIDTH)/2);
