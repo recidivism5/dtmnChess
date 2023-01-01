@@ -19,7 +19,7 @@ int main(void){
     struct addrinfo *result = NULL;
     int iSendResult;
     iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-    if (iResult) {
+    if (iResult){
         printf("WSAStartup failed with error: %d\n", iResult);
         return 1;
     }
@@ -53,7 +53,7 @@ int main(void){
         return 1;
     }
     ClientSocket = accept(ListenSocket, NULL, NULL);
-    if (ClientSocket == INVALID_SOCKET) {
+    if (ClientSocket == INVALID_SOCKET){
         printf("accept failed with error: %d\n", WSAGetLastError());
         closesocket(ListenSocket);
         WSACleanup();
@@ -62,9 +62,9 @@ int main(void){
     closesocket(ListenSocket);
     do {
         iResult = recv(ClientSocket, buf, sizeof(buf), 0);
-        if (iResult > 0) {
+        if (iResult > 0){
             printf("Bytes received: %d\n", iResult);
-            iSendResult = send( ClientSocket, buf, iResult, 0 );
+            iSendResult = send(ClientSocket, buf, iResult, 0);
             if (iSendResult == SOCKET_ERROR) {
                 printf("send failed with error: %d\n", WSAGetLastError());
                 closesocket(ClientSocket);
