@@ -105,13 +105,12 @@ bool moveLegal(int x, int y, int tx, int ty){
     }
     return FALSE;
 }
-bool singleplayerHighlighted;
-void mouseMove(int x, int y){
-    singleplayerHighlighted = x > (CELL_WIDTH*8) && (y < 16);
+bool mouseMove(int x, int y){
+    return FALSE;
 }
 Cell *selectedCell;
 char mousePos[32];
-void mouseLeftDown(int x, int y){
+bool mouseLeftDown(int x, int y){
     int cx = side ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
         cy = side ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
     if (board[BAT(cx,cy)].piece && (side==board[BAT(cx,cy)].side)) selectedCell = board + BAT(cx,cy);
@@ -125,9 +124,10 @@ void mouseLeftDown(int x, int y){
         }
     }
     sprintf(mousePos, "%d,%d", cx, cy);
+    return TRUE;
 }
-void mouseRightDown(int x, int y){
-    //side = !side;
+bool mouseRightDown(int x, int y){
+    return FALSE;
 }
 void fillRect(int x, int y, int width, int height, u32 color){
     for (int j = 0; j < height; j++){
@@ -136,7 +136,7 @@ void fillRect(int x, int y, int width, int height, u32 color){
         }
     }
 }
-#define DRAW_BUTTON(index, str) drawString(8*CELL_WIDTH+4, (index)*8+4, str);
+#define DRAW_BUTTON(index, str) drawString(8*CELL_WIDTH+4, (index)*10+4, str);
 char name[9];
 void draw(){
     for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = BROWN;
@@ -150,11 +150,14 @@ void draw(){
         }
     }
     drawString(0,0, mousePos);
-    DRAW_BUTTON(5, "Name:");
-    DRAW_BUTTON(7, "Time:");
-    DRAW_BUTTON(9, "CPU Level:");
-    DRAW_BUTTON(11, "Play CPU");
-    DRAW_BUTTON(12, "Play Human");
+    //max chars on row is 12
+    DRAW_BUTTON(0, "Time:");
+    DRAW_BUTTON(1, "<   1 min  >");
+    DRAW_BUTTON(2, "CPU lvl:");
+    DRAW_BUTTON(3, "<    10    >");
+    DRAW_BUTTON(5, "Play CPU");
+    DRAW_BUTTON(7, "Name?...");
+    DRAW_BUTTON(8, "Play Human");
 }
 void charInput(char c){
 
@@ -189,16 +192,13 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         return DefWindowProc(hwnd, msg, wparam, lparam);
     }
     case WM_MOUSEMOVE:
-        mouseMove(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
-        UPDATE
+        if (mouseMove(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)){UPDATE}
         return 0;
     case WM_LBUTTONDOWN:
-        mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
-        UPDATE
+        if (mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)){UPDATE}
         return 0;
     case WM_RBUTTONDOWN:
-        mouseRightDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
-        UPDATE
+        if (mouseRightDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)){UPDATE}
         return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -228,8 +228,8 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     RegisterClassA(&wc);
     wr.right = WND_WIDTH;
     wr.bottom = WND_HEIGHT;
-    AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
-    wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
+    AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW^WS_THICKFRAME, FALSE);
+    wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW^WS_THICKFRAME,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
     hdc = GetDC(wnd);
     UPDATE
     while (GetMessageA(&msg, NULL, 0, 0)){
