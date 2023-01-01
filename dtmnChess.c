@@ -5,6 +5,8 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef int32_t i32;
 typedef int bool;
+#define TRUE 1
+#define FALSE 0
 #define BACKGROUND_COLOR 0
 #define WHITE 0x00ffffff
 #define RED 0x00990000
@@ -88,11 +90,34 @@ void drawPieceOnCell(u16 *piece, u32 color, int x, int y){
 void init(){
     setBoard();
 }
+bool moveLegal(int x, int y, int tx, int ty){
+    Cell *start = board + AT(x,y);
+    Cell *target = board + AT(tx,ty);
+    if (!start->piece) return FALSE;
+    if (start->piece == pawn){
+        if ((tx == x) &&
+        (side ? ty < y : ty > y) &&
+        (abs(ty-y) <= (y==6 || (y==1) ? 2 : 1)) &&
+        (!target->piece)) return TRUE;
+        
+    }
+    return FALSE;
+}
+Cell *selectedCell;
 char mousePos[32];
 void mouseLeftDown(int x, int y){
     int cx = side ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
         cy = side ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
-    
+    if (board[AT(cx,cy)].piece && (side==board[AT(cx,cy)].side)) selectedCell = board + AT(cx,cy);
+    else if (selectedCell){
+        int x = (selectedCell-board) % 8,
+            y = (selectedCell-board) / 8;
+        if (moveLegal(x,y, cx,cy)){
+            board[AT(cx,cy)] = *selectedCell;
+            selectedCell->piece = NULL;
+            selectedCell = NULL;
+        }
+    }
     sprintf(mousePos, "%d,%d", cx, cy);
 }
 void mouseRightDown(int x, int y){
@@ -114,6 +139,7 @@ void charInput(char c){
 
 }
 #if _WIN32
+#undef UNICODE
 #include <windows.h>
 #include <dwmapi.h>
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
