@@ -159,7 +159,8 @@ void incCpuLvl(){
         sprintf(cpuLvlStr, "%d", cpuLvl);
     }
 }
-bool requestingUpdate;
+bool connected;
+bool turn;
 #if _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -179,22 +180,23 @@ typedef struct Move {
     i8 x,y,tx,ty;
 }Move;
 Move move;
+SOCKET sock;
 int findGame(){
     WSADATA wsaData;
-    SOCKET cs = INVALID_SOCKET;
     struct addrinfo *result = NULL,
                     *ptr = NULL;
     WSAStartup(MAKEWORD(2,2), &wsaData);
     getaddrinfo("localhost", port, &hints, &result);
     for (ptr=result; ptr != NULL; ptr=ptr->ai_next){
-        cs = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-        if (SOCKET_ERROR != connect(cs, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
-        closesocket(cs);
+        sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+        if (SOCKET_ERROR != connect(sock, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
+        closesocket(sock);
     }
     freeaddrinfo(result);
-    send(cs, minutes, sizeof(*minutes), 0);
+    connected = TRUE;
+    return 0;
+    /*send(cs, minutes, sizeof(*minutes), 0);
     recv(cs, &side, sizeof(side), 0);
-    requestingUpdate = TRUE;
     i8 lastx = -1;
     while (move.x > 0){
         if (move.x != lastx){
@@ -204,7 +206,7 @@ int findGame(){
     }
     closesocket(cs);
     WSACleanup();
-    return 0;
+    return 0;*/
 }
 void playHuman(){
     CreateThread(NULL, 4096, findGame, NULL, 0, NULL);
@@ -360,9 +362,8 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
-        if (requestingUpdate){
-            update();
-            requestingUpdate = FALSE;
+        if (inGame){
+
         }
     }
     return msg.wParam;
