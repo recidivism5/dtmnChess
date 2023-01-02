@@ -8,14 +8,20 @@
 #pragma comment (lib, "Ws2_32.lib")
 #include <stdint.h>
 typedef uint8_t u8;
+typedef int8_t i8;
 u8 buf[512];
 char port[]="6969";
 struct addrinfo hints = {AI_PASSIVE,AF_INET,SOCK_STREAM,IPPROTO_TCP};
+typedef struct Move {
+    i8 x,y,tx,ty;
+}Move;
+Move move;
 int main(void){
+    srand(69);
     WSADATA wsaData;
     int iResult;
     SOCKET ListenSocket = INVALID_SOCKET;
-    SOCKET ClientSocket = INVALID_SOCKET;
+    SOCKET clients[2];
     struct addrinfo *result = NULL;
     int iSendResult;
     iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
@@ -52,44 +58,28 @@ int main(void){
         WSACleanup();
         return 1;
     }
-    ClientSocket = accept(ListenSocket, NULL, NULL);
-    if (ClientSocket == INVALID_SOCKET){
-        printf("accept failed with error: %d\n", WSAGetLastError());
-        closesocket(ListenSocket);
-        WSACleanup();
-        return 1;
+    while (1){
+        clients[0] = accept(ListenSocket, NULL, NULL);
+        clients[1] = accept(ListenSocket, NULL, NULL);
+        int min0, min1;
+        recv(clients[0], &min0, sizeof(min0), 0);
+        recv(clients[1], &min1, sizeof(min1), 0);
+        if (((min0==1)||(min0==3)||(min0==5)||(min0==10))&&(min0==min1)){
+            printf("Starting %d minute game\n", min0);
+            char side = rand() % 2;
+            send(clients[side], &side, sizeof(side), 0);
+            side = !side;
+            send(clients[side], &side, sizeof(side), 0);
+            side = !side;
+            while (0 < recv(clients[side], &move, sizeof(move), 0)){
+                printf("Side %d requesting (%d,%d) to (%d,%d)\n", side, move.x,move.y,move.tx,move.ty);
+                side = !side;
+            }
+        }
+        closesocket(client0);
+        closesocket(client1);
     }
     closesocket(ListenSocket);
-    do {
-        iResult = recv(ClientSocket, buf, sizeof(buf), 0);
-        if (iResult > 0){
-            printf("Bytes received: %d\n", iResult);
-            iSendResult = send(ClientSocket, buf, iResult, 0);
-            if (iSendResult == SOCKET_ERROR) {
-                printf("send failed with error: %d\n", WSAGetLastError());
-                closesocket(ClientSocket);
-                WSACleanup();
-                return 1;
-            }
-            printf("Bytes sent: %d\n", iSendResult);
-        }
-        else if (iResult == 0)
-            printf("Connection closing...\n");
-        else  {
-            printf("recv failed with error: %d\n", WSAGetLastError());
-            closesocket(ClientSocket);
-            WSACleanup();
-            return 1;
-        }
-    } while (iResult > 0);
-    iResult = shutdown(ClientSocket, SD_SEND);
-    if (iResult == SOCKET_ERROR) {
-        printf("shutdown failed with error: %d\n", WSAGetLastError());
-        closesocket(ClientSocket);
-        WSACleanup();
-        return 1;
-    }
-    closesocket(ClientSocket);
     WSACleanup();
     return 0;
 }

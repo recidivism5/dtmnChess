@@ -4,8 +4,9 @@
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
+typedef int8_t i8;
 typedef int32_t i32;
-typedef int bool;
+typedef i8 bool;
 #define TRUE 1
 #define FALSE 0
 #define COUNT(arr) (sizeof(arr)/sizeof(*arr))
@@ -158,6 +159,58 @@ void incCpuLvl(){
         sprintf(cpuLvlStr, "%d", cpuLvl);
     }
 }
+bool requestingUpdate;
+#if _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <stdlib.h>
+#include <stdio.h>
+#pragma comment (lib, "Ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
+#include <stdint.h>
+typedef uint8_t u8;
+u8 buf[512];
+char port[]="6969";
+struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
+typedef struct Move {
+    i8 x,y,tx,ty;
+}Move;
+Move move;
+int findGame(){
+    WSADATA wsaData;
+    SOCKET cs = INVALID_SOCKET;
+    struct addrinfo *result = NULL,
+                    *ptr = NULL;
+    WSAStartup(MAKEWORD(2,2), &wsaData);
+    getaddrinfo("localhost", port, &hints, &result);
+    for (ptr=result; ptr != NULL; ptr=ptr->ai_next){
+        cs = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+        if (SOCKET_ERROR != connect(cs, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
+        closesocket(cs);
+    }
+    freeaddrinfo(result);
+    send(cs, minutes, sizeof(*minutes), 0);
+    recv(cs, &side, sizeof(side), 0);
+    requestingUpdate = TRUE;
+    i8 lastx = -1;
+    while (move.x > 0){
+        if (move.x != lastx){
+            send(cs, &move, sizeof(move), 0);
+            lastx = move.x;
+        }
+    }
+    closesocket(cs);
+    WSACleanup();
+    return 0;
+}
+void playHuman(){
+    CreateThread(NULL, 4096, findGame, NULL, 0, NULL);
+}
+#elif __APPLE__
+#endif
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
 Button buttons[]={
     {CHARPOS(0,0), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Minutes:", NULL},
@@ -167,7 +220,9 @@ Button buttons[]={
     {CHARPOS(0,2), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "CPU Lvl:", NULL},
     {CHARPOS(0,3), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, cpuLvlStr, NULL},
     {2+CHARPOS(2,3), GLYPH_WIDTH, GLYPH_HEIGHT, "<", decCpuLvl},
-    {2+CHARPOS(13,3), GLYPH_WIDTH, GLYPH_HEIGHT, ">", incCpuLvl}
+    {2+CHARPOS(13,3), GLYPH_WIDTH, GLYPH_HEIGHT, ">", incCpuLvl},
+    {CHARPOS(0,5), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Play CPU", NULL},
+    {CHARPOS(0,7), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Play Human", playHuman}
 };
 bool mouseMove(int x, int y){
     for (int i = 0; i < COUNT(buttons); i++){
@@ -241,7 +296,10 @@ struct BMI {
     RGBQUAD             bmiColors[3];
 } bmi;
 HDC hdc;
-#define UPDATE draw(); StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
+void update(){
+    draw();
+    StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
+}
 LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
     BOOL t = TRUE;
     switch (msg){
@@ -259,13 +317,13 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         return DefWindowProc(hwnd, msg, wparam, lparam);
     }
     case WM_MOUSEMOVE:
-        if (mouseMove(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)){UPDATE}
+        if (mouseMove(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)) update();
         return 0;
     case WM_LBUTTONDOWN:
-        if (mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)){UPDATE}
+        if (mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)) update();
         return 0;
     case WM_RBUTTONDOWN:
-        if (mouseRightDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)){UPDATE}
+        if (mouseRightDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)) update();
         return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -287,7 +345,6 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     bmi.bmiColors[0].rgbRed = 0xff;
     bmi.bmiColors[1].rgbGreen = 0xff;
     bmi.bmiColors[2].rgbBlue = 0xff;
-    init();
     wc.hInstance = hCurrentInst;
     wc.hIcon = LoadIconA(0,IDI_APPLICATION);
     wc.hCursor = LoadCursorA(0,IDC_ARROW);
@@ -298,10 +355,15 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW^WS_THICKFRAME, FALSE);
     wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW^WS_THICKFRAME,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
     hdc = GetDC(wnd);
-    UPDATE
+    init();
+    update();
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
+        if (requestingUpdate){
+            update();
+            requestingUpdate = FALSE;
+        }
     }
     return msg.wParam;
 }
