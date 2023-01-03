@@ -103,14 +103,44 @@ void init(){
 bool moveLegal(int x, int y, int tx, int ty){
     Cell *start = board + BAT(x,y);
     Cell *target = board + BAT(tx,ty);
-    if (!start->piece) return FALSE;
-    if (start->piece == pawn){
-        if ((tx == x) &&
-        (side ? ty < y : ty > y) &&
-        (abs(ty-y) <= (y==6 || (y==1) ? 2 : 1)) &&
-        (!target->piece)) return TRUE;
+    if ((start == target) || (!start->piece) || (target->piece && (target->side == side))) return FALSE;
+    if (start->piece == pawn) return (
+        ((tx == x) && (side ? ty < y : ty > y) && (abs(ty-y) <= (y==6 || (y==1) ? 2 : 1)) && (!target->piece)) ||
+        ((abs(tx-x)==1) && (side ? ty < y : ty > y) && (target->piece))
+    );
+    else if (start->piece == rook){
+        if (x==tx){
+            int d = y < ty ? 1 : -1;
+            for (int i = y + d; i != ty; i += d)
+                if (board[BAT(x,i)].piece) return FALSE;
+        } else if (y==ty){
+            int d = x < tx ? 1 : -1;
+            for (int i = x + d; i != tx; i += d)
+                if (board[BAT(i,y)].piece) return FALSE;
+        } else return FALSE;
     }
-    return FALSE;
+    else if (start->piece == knight) return (((abs(tx-x)==2)&&(abs(ty-y)==1))||((abs(ty-y)==2)&&(abs(tx-x)==1)));
+    else if (start->piece == bishop){
+        if (abs(tx-x) != abs(ty-y)) return FALSE;
+        for (int i = 1; i != abs(tx-x); i++)
+            if (board[BAT(x+(x < tx ? 1 : -1),y+(y < ty ? 1 : -1))].piece) return FALSE;
+    }
+    else if (start->piece == queen){
+        if (x==tx){
+            int d = y < ty ? 1 : -1;
+            for (int i = y + d; i != ty; i += d)
+                if (board[BAT(x,i)].piece) return FALSE;
+        } else if (y==ty){
+            int d = x < tx ? 1 : -1;
+            for (int i = x + d; i != tx; i += d)
+                if (board[BAT(i,y)].piece) return FALSE;
+        } else if (abs(tx-x)==abs(ty-y)){
+            for (int i = 1; i != abs(tx-x); i++)
+            if (board[BAT(x+(x < tx ? 1 : -1),y+(y < ty ? 1 : -1))].piece) return FALSE;
+        } else return FALSE;
+    }
+    else if ((1 < abs(tx-x))||(1 < abs(ty-y))) return FALSE;
+    return TRUE;
 }
 void fillRect(int x, int y, int width, int height, u32 color){
     for (int j = 0; j < height; j++){
