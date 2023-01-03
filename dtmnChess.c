@@ -159,6 +159,10 @@ void incCpuLvl(){
         sprintf(cpuLvlStr, "%d", cpuLvl);
     }
 }
+typedef struct Move {
+    i8 x,y,tx,ty;
+}Move;
+Move move;
 bool connected;
 bool turn;
 #if _WIN32
@@ -166,50 +170,57 @@ bool turn;
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <stdlib.h>
-#include <stdio.h>
 #pragma comment (lib, "Ws2_32.lib")
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
-#include <stdint.h>
-typedef uint8_t u8;
+void sendAll(SOCKET s, u8 *b, int c){
+    int p = 0;
+    while (p < c) p += send(s, b+p, c-p, 0);
+}
+void recvAll(SOCKET s, u8 *b, int c){
+    int p = 0;
+    while (p < c) p += recv(s, b+p, c-p, 0);
+}
 u8 buf[512];
 char port[]="6969";
 struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
-typedef struct Move {
-    i8 x,y,tx,ty;
-}Move;
-Move move;
-SOCKET sock;
 int findGame(){
     WSADATA wsaData;
     struct addrinfo *result = NULL,
                     *ptr = NULL;
     WSAStartup(MAKEWORD(2,2), &wsaData);
     getaddrinfo("localhost", port, &hints, &result);
+    SOCKET sock;
     for (ptr=result; ptr != NULL; ptr=ptr->ai_next){
         sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
         if (SOCKET_ERROR != connect(sock, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
         closesocket(sock);
     }
     freeaddrinfo(result);
-    connected = TRUE;
-    return 0;
-    /*send(cs, minutes, sizeof(*minutes), 0);
-    recv(cs, &side, sizeof(side), 0);
-    i8 lastx = -1;
-    while (move.x > 0){
-        if (move.x != lastx){
-            send(cs, &move, sizeof(move), 0);
-            lastx = move.x;
+    sendAll(sock, minutes, sizeof(*minutes), 0);
+    recvAll(sock, &side, sizeof(side), 0);
+    if (side) recvAll(sock, &move, sizeof(move), 0);
+    turn = TRUE;
+    while (1){
+        if (!turn){
+            printf("sending move: (%d,%d) to (%d,%d)\n",move.x,move.y,move.tx,move.ty);
+            sendAll(sock, &move, sizeof(move), 0);
+            recvAll(sock, &move, sizeof(move), 0);
+            board[BAT(move.tx,move.ty)] = board[BAT(move.x,move.y)];
+            board[BAT(move.x,move.y)].piece = NULL;
+            turn = TRUE;
         }
     }
-    closesocket(cs);
+    closesocket(sock);
     WSACleanup();
-    return 0;*/
+    connected = FALSE;
+    return 0;
 }
 void playHuman(){
-    CreateThread(NULL, 4096, findGame, NULL, 0, NULL);
+    if (!connected){
+        connected = TRUE;
+        CreateThread(NULL, 0, findGame, NULL, 0, NULL);
+    }
 }
 #elif __APPLE__
 #endif
@@ -252,17 +263,21 @@ char mousePos[32];
 bool mouseLeftDown(int x, int y){
     int cx = side ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
         cy = side ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
-    if (board[BAT(cx,cy)].piece && (side==board[BAT(cx,cy)].side)) selectedCell = board + BAT(cx,cy);
-    else if (selectedCell){
-        int x = (selectedCell-board) % 8,
-            y = (selectedCell-board) / 8;
-        if (moveLegal(x,y, cx,cy)){
-            board[BAT(cx,cy)] = *selectedCell;
-            selectedCell->piece = NULL;
-            selectedCell = NULL;
+    if (cx < 8){
+        if (board[BAT(cx,cy)].piece && (side==board[BAT(cx,cy)].side)) selectedCell = board + BAT(cx,cy);
+        else if (selectedCell){
+            int x = (selectedCell-board) % 8,
+                y = (selectedCell-board) / 8;
+            if (turn && moveLegal(x,y, cx,cy)){
+                board[BAT(cx,cy)] = *selectedCell;
+                selectedCell->piece = NULL;
+                selectedCell = NULL;
+                move = (Move){x,y,cx,cy};
+                turn = FALSE;
+            }
         }
+        sprintf(mousePos, "%d,%d", cx, cy);
     }
-    sprintf(mousePos, "%d,%d", cx, cy);
     if (hoveredButton) hoveredButton->func();
     return TRUE;
 }
@@ -338,6 +353,9 @@ HWND wnd;
 MSG msg;
 RECT wr;
 int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int nCmdShow){
+    AllocConsole();
+    FILE* fDummy;
+    freopen_s(&fDummy, "CONOUT$", "w", stdout);
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
@@ -362,9 +380,6 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
-        if (inGame){
-
-        }
     }
     return msg.wParam;
 }

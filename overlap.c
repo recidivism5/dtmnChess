@@ -31,8 +31,171 @@ typedef struct _socklist{
     WSABUF DataBuf;
 }Socklist;
 int curr_size = 0;
-int DoWait(WSAEVENT *, Socklist *);
-void HandleEvent(int, WSAEVENT *, Socklist *);
+void HandleEvent(int index, WSAEVENT *Handles, Socklist *socklist){
+    WSAOVERLAPPED *Overlap;
+    SOCKET newsock = INVALID_SOCKET;
+    DWORD bytes = 0;
+    DWORD flags = 0;
+    DWORD lasterr = 0;
+    int i = 0;
+    Overlap = socklist[index].overlap;
+    if (!WSAResetEvent(Handles[index])){
+        ERR("WSAResetEvent()");
+    }
+    if ( !WSAGetOverlappedResult(socklist[index].sock,
+                                 Overlap,
+                                 &bytes,
+                                 FALSE,
+                                 &flags)){
+        ERR("WSAGetOverlappedResult()");
+    }
+    newsock = socklist[index].SockAccepted;
+    if ( (index != 0) && (bytes == 0 ) ){
+        CLOSESOCK(newsock);
+        XFREE(Overlap);
+        CLOSEEVENT(Handles[index]);
+        for ( i = index; i < curr_size; i++ ){
+            Handles[i] = Handles[i+1];
+            socklist[i] = socklist[i+1];
+        }
+        curr_size--;
+        return;
+    }
+    if ( (index == 0) ){
+        if ( curr_size >= MAX_IO_PEND ){
+            shutdown(newsock, SD_BOTH);
+            CLOSESOCK(newsock);
+            fprintf(stderr,"Too many pending requests\n");
+            return;
+        }
+        Handles[curr_size] = Overlap->hEvent;
+        socklist[curr_size].sock = newsock;
+        SecureZeroMemory(socklist[curr_size].Buffer,
+                         sizeof(socklist[curr_size].Buffer)/sizeof(socklist[curr_size].Buffer[0]
+                         ));
+        socklist[curr_size].overlap = Overlap;
+        socklist[curr_size].DataBuf.len = sizeof(socklist[curr_size].Buffer);
+        socklist[curr_size].DataBuf.buf = socklist[curr_size].Buffer;
+        socklist[curr_size].Op = OP_READ;
+        flags = 0;
+        if ( SOCKET_ERROR == WSARecv(socklist[curr_size].sock,
+                                     &(socklist[curr_size].DataBuf),
+                                     1,
+                                     &bytes,
+                                     &flags,
+                                     socklist[curr_size].overlap,
+                                     NULL
+                                     )){
+            lasterr = WSAGetLastError();
+            if ( WSA_IO_PENDING != lasterr){
+                ERR("WSARecv()");
+                if ( WSAECONNRESET == lasterr){
+                    shutdown(newsock, SD_BOTH);
+                    CLOSESOCK(newsock);
+                    XFREE(Overlap);
+                    CLOSEEVENT(Handles[index]);
+                    for ( i = index; i < curr_size; i++ ){
+                        Handles[i] = Handles[i+1];
+                        socklist[i] = socklist[i+1];
+                    }
+                    curr_size--;
+                }
+                return;
+            }
+        }
+        curr_size++;
+        return;
+    }
+    if ( socklist[index].Op == OP_READ ){
+        printf("Read buffer [%s]\n", socklist[index].Buffer);
+        printf("Echoing back to client\n");
+        if ( SOCKET_ERROR == WSASend(socklist[index].sock,
+                                     &(socklist[index].DataBuf),
+                                     1,
+                                     &bytes,
+                                     0,
+                                     socklist[index].overlap,
+                                     NULL)){
+            lasterr = WSAGetLastError();
+            if(WSA_IO_PENDING != lasterr){
+                ERR("WSASend()");
+                if ( WSAECONNRESET == lasterr){
+                    shutdown(newsock, SD_BOTH);
+                    CLOSESOCK(newsock);
+                    XFREE(Overlap);
+                    CLOSEEVENT(Handles[index]);
+                    for ( i = index; i < curr_size; i++ ){
+                        Handles[i] = Handles[i+1];
+                        socklist[i] = socklist[i+1];
+                    }
+                    curr_size--;
+                }
+                return;
+            }
+        }
+        socklist[index].Op = OP_WRITE;
+        return;
+    }
+    else if ( socklist[index].Op == OP_WRITE ){
+        printf("Wrote %d bytes\n",bytes);
+        printf("Queueing read\n");
+        flags = 0;
+        if ( SOCKET_ERROR == WSARecv(socklist[index].sock,
+                                     &(socklist[index].DataBuf),
+                                     1,
+                                     &bytes,
+                                     &flags,
+                                     socklist[index].overlap,
+                                     NULL
+                                     )){
+            lasterr = WSAGetLastError();
+            if(WSA_IO_PENDING != lasterr){
+                ERR("WSARecv()");
+                if ( WSAECONNRESET == lasterr){
+                    shutdown(newsock, SD_BOTH);
+                    CLOSESOCK(newsock);
+                    XFREE(Overlap);
+                    CLOSEEVENT(Handles[index]);
+                    for ( i = index; i < curr_size; i++ ){
+                        Handles[i] = Handles[i+1];
+                        socklist[i] = socklist[i+1];
+                    }
+                    curr_size--;
+                }
+                return;
+            }
+        }
+        socklist[index].Op = OP_READ;
+        return;
+    }
+    else{
+        fprintf(stderr,"Unknown operation queued\n");
+    }
+}
+int DoWait(WSAEVENT *Handles, Socklist *socklist){
+    DWORD wait_rc = 0;
+    WSAEVENT hTemp = WSA_INVALID_EVENT;
+    Socklist socklTemp;
+    int i = 0;
+    for ( i = 1; i < curr_size-1; i++ ){
+        hTemp = Handles[i+1];
+        Handles[i+1] = Handles[i];
+        Handles[i] = hTemp;
+        socklTemp = socklist[i+1];
+        socklist[i+1] = socklist[i];
+        socklist[i] = socklTemp;
+    }
+    if(WSA_WAIT_FAILED == (wait_rc = WSAWaitForMultipleEvents(curr_size,
+                                                              Handles,
+                                                              FALSE,
+                                                              WSA_INFINITE,
+                                                              FALSE
+                                                              ))){
+        ERR("WSAWaitForMultipleEvents()");
+        return -1;
+    }
+    return(wait_rc - WSA_WAIT_EVENT_0);
+}
 void Usage(char *progname){
     fprintf(stderr,"Usage\n%s -e [endpoint] -i [interface]\n",
             progname);
@@ -245,169 +408,4 @@ int __cdecl main(int argc, char **argv){
         CLOSEEVENT(Overlap->hEvent);
         XFREE(Overlap);
     }
-}
-void HandleEvent(int index, WSAEVENT *Handles, Socklist *socklist){
-    WSAOVERLAPPED *Overlap;
-    SOCKET newsock = INVALID_SOCKET;
-    DWORD bytes = 0;
-    DWORD    flags    =    0;
-    DWORD lasterr = 0;
-    int i = 0;
-    Overlap = socklist[index].overlap;
-    if (!WSAResetEvent(Handles[index])){
-        ERR("WSAResetEvent()");
-    }
-    if ( !WSAGetOverlappedResult(socklist[index].sock,
-                                 Overlap,
-                                 &bytes,
-                                 FALSE,
-                                 &flags)){
-        ERR("WSAGetOverlappedResult()");
-    }
-    newsock = socklist[index].SockAccepted;
-    if ( (index != 0) && (bytes == 0 ) ){
-        CLOSESOCK(newsock);
-        XFREE(Overlap);
-        CLOSEEVENT(Handles[index]);
-        for ( i = index; i < curr_size; i++ ){
-            Handles[i] = Handles[i+1];
-            socklist[i] = socklist[i+1];
-        }
-        curr_size--;
-        return;
-    }
-    if ( (index == 0) ){
-        if ( curr_size >= MAX_IO_PEND ){
-            shutdown(newsock, SD_BOTH);
-            CLOSESOCK(newsock);
-            fprintf(stderr,"Too many pending requests\n");
-            return;
-        }
-        Handles[curr_size] = Overlap->hEvent;
-        socklist[curr_size].sock = newsock;
-        SecureZeroMemory(socklist[curr_size].Buffer,
-                         sizeof(socklist[curr_size].Buffer)/sizeof(socklist[curr_size].Buffer[0]
-                         ));
-        socklist[curr_size].overlap = Overlap;
-        socklist[curr_size].DataBuf.len = sizeof(socklist[curr_size].Buffer);
-        socklist[curr_size].DataBuf.buf = socklist[curr_size].Buffer;
-        socklist[curr_size].Op = OP_READ;
-        flags = 0;
-        if ( SOCKET_ERROR == WSARecv(socklist[curr_size].sock,
-                                     &(socklist[curr_size].DataBuf),
-                                     1,
-                                     &bytes,
-                                     &flags,
-                                     socklist[curr_size].overlap,
-                                     NULL
-                                     )){
-            lasterr = WSAGetLastError();
-            if ( WSA_IO_PENDING != lasterr){
-                ERR("WSARecv()");
-                if ( WSAECONNRESET == lasterr){
-                    shutdown(newsock, SD_BOTH);
-                    CLOSESOCK(newsock);
-                    XFREE(Overlap);
-                    CLOSEEVENT(Handles[index]);
-                    for ( i = index; i < curr_size; i++ ){
-                        Handles[i] = Handles[i+1];
-                        socklist[i] = socklist[i+1];
-                    }
-                    curr_size--;
-                }
-                return;
-            }
-        }
-        curr_size++;
-        return;
-    }
-    if ( socklist[index].Op == OP_READ ){
-        printf("Read buffer [%s]\n", socklist[index].Buffer);
-        printf("Echoing back to client\n");
-        if ( SOCKET_ERROR == WSASend(socklist[index].sock,
-                                     &(socklist[index].DataBuf),
-                                     1,
-                                     &bytes,
-                                     0,
-                                     socklist[index].overlap,
-                                     NULL)){
-            lasterr = WSAGetLastError();
-            if(WSA_IO_PENDING != lasterr){
-                ERR("WSASend()");
-                if ( WSAECONNRESET == lasterr){
-                    shutdown(newsock, SD_BOTH);
-                    CLOSESOCK(newsock);
-                    XFREE(Overlap);
-                    CLOSEEVENT(Handles[index]);
-                    for ( i = index; i < curr_size; i++ ){
-                        Handles[i] = Handles[i+1];
-                        socklist[i] = socklist[i+1];
-                    }
-                    curr_size--;
-                }
-                return;
-            }
-        }
-        socklist[index].Op = OP_WRITE;
-        return;
-    }
-    else if ( socklist[index].Op == OP_WRITE ){
-        printf("Wrote %d bytes\n",bytes);
-        printf("Queueing read\n");
-        flags = 0;
-        if ( SOCKET_ERROR == WSARecv(socklist[index].sock,
-                                     &(socklist[index].DataBuf),
-                                     1,
-                                     &bytes,
-                                     &flags,
-                                     socklist[index].overlap,
-                                     NULL
-                                     )){
-            lasterr = WSAGetLastError();
-            if(WSA_IO_PENDING != lasterr){
-                ERR("WSARecv()");
-                if ( WSAECONNRESET == lasterr){
-                    shutdown(newsock, SD_BOTH);
-                    CLOSESOCK(newsock);
-                    XFREE(Overlap);
-                    CLOSEEVENT(Handles[index]);
-                    for ( i = index; i < curr_size; i++ ){
-                        Handles[i] = Handles[i+1];
-                        socklist[i] = socklist[i+1];
-                    }
-                    curr_size--;
-                }
-                return;
-            }
-        }
-        socklist[index].Op = OP_READ;
-        return;
-    }
-    else{
-        fprintf(stderr,"Unknown operation queued\n");
-    }
-}
-int DoWait(WSAEVENT *Handles, Socklist *socklist){
-    DWORD wait_rc = 0;
-    WSAEVENT hTemp = WSA_INVALID_EVENT;
-    Socklist socklTemp;
-    int i = 0;
-    for ( i = 1; i < curr_size-1; i++ ){
-        hTemp = Handles[i+1];
-        Handles[i+1] = Handles[i];
-        Handles[i] = hTemp;
-        socklTemp = socklist[i+1];
-        socklist[i+1] = socklist[i];
-        socklist[i] = socklTemp;
-    }
-    if(WSA_WAIT_FAILED == (wait_rc = WSAWaitForMultipleEvents(curr_size,
-                                                              Handles,
-                                                              FALSE,
-                                                              WSA_INFINITE,
-                                                              FALSE
-                                                              ))){
-        ERR("WSAWaitForMultipleEvents()");
-        return -1;
-    }
-    return(wait_rc - WSA_WAIT_EVENT_0);
 }

@@ -9,6 +9,18 @@
 #include <stdint.h>
 typedef uint8_t u8;
 typedef int8_t i8;
+void sendAll(SOCKET s, u8 *b, int c){
+    int p = 0, temp;
+    while (p < c) p += send(s, b, c, 0);
+}
+int recvAll(SOCKET s, u8 *b, int c){
+    int p = 0, temp;
+    while (p < c){
+        if (0 == (temp = recv(s, b+p, c-p, 0))) return 0;
+        p += temp;
+    }
+    return c;
+}
 u8 buf[512];
 char port[]="6969";
 struct addrinfo hints = {AI_PASSIVE,AF_INET,SOCK_STREAM,IPPROTO_TCP};
@@ -62,22 +74,26 @@ int main(void){
         clients[0] = accept(ListenSocket, NULL, NULL);
         clients[1] = accept(ListenSocket, NULL, NULL);
         int min0, min1;
-        recv(clients[0], &min0, sizeof(min0), 0);
-        recv(clients[1], &min1, sizeof(min1), 0);
+        recvAll(clients[0], &min0, sizeof(min0), 0);
+        recvAll(clients[1], &min1, sizeof(min1), 0);
         if (((min0==1)||(min0==3)||(min0==5)||(min0==10))&&(min0==min1)){
             printf("Starting %d minute game\n", min0);
             char side = rand() % 2;
-            send(clients[side], &side, sizeof(side), 0);
+            sendAll(clients[0], &side, sizeof(side), 0);
             side = !side;
-            send(clients[side], &side, sizeof(side), 0);
+            sendAll(clients[1], &side, sizeof(side), 0);
             side = !side;
-            while (0 < recv(clients[side], &move, sizeof(move), 0)){
-                printf("Side %d requesting (%d,%d) to (%d,%d)\n", side, move.x,move.y,move.tx,move.ty);
+            while (1){
+                printf("joj\n");
+                if (!recvAll(clients[side], &move, sizeof(move), 0)) break;
+                printf("Side %d requesting (%d,%d) to (%d,%d)\n", !side, move.x,move.y,move.tx,move.ty);
                 side = !side;
+                sendAll(clients[side], &move, sizeof(move), 0);
             }
         }
-        closesocket(client0);
-        closesocket(client1);
+        printf("Closing connections\n");
+        closesocket(clients[0]);
+        closesocket(clients[1]);
     }
     closesocket(ListenSocket);
     WSACleanup();
