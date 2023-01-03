@@ -204,9 +204,12 @@ void findGame(){
     freeaddrinfo(result);
     sendAll(sock, minutes, sizeof(*minutes), 0);
     recvAll(sock, &side, sizeof(side), 0);
-    if (side) recvAll(sock, &move, sizeof(move), 0); //get first move if black
-    doMove();
     update();
+    if (side){
+        recvAll(sock, &move, sizeof(move), 0); //get first move if black
+        doMove();
+        update();
+    }
     turn = TRUE;
 }
 void stepGame(){
