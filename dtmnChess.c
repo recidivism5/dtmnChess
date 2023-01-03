@@ -150,7 +150,7 @@ bool moveLegal(Cell *b, int x, int y, int tx, int ty){
                 if (b[BAT(i,y)].piece) return FALSE;
         } else if (abs(tx-x)==abs(ty-y)){
             for (int i = 1; i != abs(tx-x); i++)
-            if (b[BAT(x+(x < tx ? 1 : -1),y+(y < ty ? 1 : -1))].piece) return FALSE;
+                if (b[BAT(x+(x < tx ? i : -i),y+(y < ty ? i : -i))].piece) return FALSE;
         } else return FALSE;
     }
     else if ((1 < abs(tx-x))||(1 < abs(ty-y))) return FALSE;
