@@ -163,8 +163,13 @@ typedef struct Move {
     i8 x,y,tx,ty;
 }Move;
 Move move;
+void doMove(){
+    board[BAT(move.tx,move.ty)] = board[BAT(move.x,move.y)];
+    board[BAT(move.x,move.y)].piece = NULL;
+}
 bool connected;
 bool turn;
+void update();
 #if _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -184,13 +189,13 @@ void recvAll(SOCKET s, u8 *b, int c){
 u8 buf[512];
 char port[]="6969";
 struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
-int findGame(){
+SOCKET sock;
+void findGame(){
     WSADATA wsaData;
     struct addrinfo *result = NULL,
                     *ptr = NULL;
     WSAStartup(MAKEWORD(2,2), &wsaData);
     getaddrinfo("localhost", port, &hints, &result);
-    SOCKET sock;
     for (ptr=result; ptr != NULL; ptr=ptr->ai_next){
         sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
         if (SOCKET_ERROR != connect(sock, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
@@ -199,22 +204,22 @@ int findGame(){
     freeaddrinfo(result);
     sendAll(sock, minutes, sizeof(*minutes), 0);
     recvAll(sock, &side, sizeof(side), 0);
-    if (side) recvAll(sock, &move, sizeof(move), 0);
+    if (side) recvAll(sock, &move, sizeof(move), 0); //get first move if black
+    doMove();
+    update();
     turn = TRUE;
-    while (1){
-        if (!turn){
-            printf("sending move: (%d,%d) to (%d,%d)\n",move.x,move.y,move.tx,move.ty);
-            sendAll(sock, &move, sizeof(move), 0);
-            recvAll(sock, &move, sizeof(move), 0);
-            board[BAT(move.tx,move.ty)] = board[BAT(move.x,move.y)];
-            board[BAT(move.x,move.y)].piece = NULL;
-            turn = TRUE;
-        }
-    }
+}
+void stepGame(){
+    sendAll(sock, &move, sizeof(move), 0);
+    recvAll(sock, &move, sizeof(move), 0);
+    doMove();
+    update();
+    turn = TRUE;
+}
+void closeGame(){
     closesocket(sock);
     WSACleanup();
     connected = FALSE;
-    return 0;
 }
 void playHuman(){
     if (!connected){
@@ -274,6 +279,7 @@ bool mouseLeftDown(int x, int y){
                 selectedCell = NULL;
                 move = (Move){x,y,cx,cy};
                 turn = FALSE;
+                CreateThread(NULL, 0, stepGame, NULL, 0, NULL);
             }
         }
         sprintf(mousePos, "%d,%d", cx, cy);
