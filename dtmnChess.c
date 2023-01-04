@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdint.h>
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -255,35 +256,34 @@ void update();
 #pragma comment (lib, "Ws2_32.lib")
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
-void sendAll(SOCKET s, u8 *b, int c){
+SOCKET sock;
+void sendAll(u8 *b, int c){
     int p = 0;
     while (p < c) p += send(s, b+p, c-p, 0);
 }
-void recvAll(SOCKET s, u8 *b, int c){
+void recvAll(u8 *b, int c){
     int p = 0;
     while (p < c) p += recv(s, b+p, c-p, 0);
 }
 u8 buf[512];
-char port[]="6969";
 struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
-SOCKET sock;
 void findGame(){
     WSADATA wsaData;
     struct addrinfo *result = NULL,
                     *ptr = NULL;
     WSAStartup(MAKEWORD(2,2), &wsaData);
-    getaddrinfo("localhost", port, &hints, &result);
+    getaddrinfo("surnd.net", "6464", &hints, &result);
     for (ptr=result; ptr != NULL; ptr=ptr->ai_next){
         sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
         if (SOCKET_ERROR != connect(sock, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
         closesocket(sock);
     }
     freeaddrinfo(result);
-    sendAll(sock, minutes, sizeof(*minutes), 0);
-    recvAll(sock, &gSide, sizeof(gSide), 0);
+    sendAll(minutes, sizeof(*minutes));
+    recvAll(&gSide, sizeof(gSide));
     update();
     if (gSide){
-        recvAll(sock, &move, sizeof(move), 0); //get first move if black
+        recvAll(&move, sizeof(move)); //get first move if black
         doMove(&board, move);
         update();
     }
@@ -295,10 +295,10 @@ void closeGame(){
     connected = FALSE;
 }
 void stepGame(){
-    sendAll(sock, &move, sizeof(move), 0);
+    sendAll(&move, sizeof(move));
     if (checkWin(gSide)) closeGame();
     else {
-        recvAll(sock, &move, sizeof(move), 0);
+        recvAll(&move, sizeof(move));
         doMove(&board, move);
         if (checkWin(!gSide)) closeGame();
     }
@@ -312,6 +312,41 @@ void playHuman(){
     }
 }
 #elif __APPLE__
+#include <sys/socket.h>
+#include <netdb.h>
+int sock;
+void sendAll(u8 *b, int c){
+    int p = 0;
+    while (p < c) p += send(sock, b+p, c-p, 0);
+}
+void recvAll(u8 *b, int c){
+    int p = 0;
+    while (p < c) p += recv(sock, b+p, c-p, 0);
+}
+void findGame(){
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    struct hostent *he = gethostbyname("surnd.net");
+    struct sockaddr_in sa;
+    memcpy(&sa.sin_addr, he->h_addr_list, sizeof(sa.sin_addr));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(6464);
+    connect(sock, &sa, sizeof(sa));
+    sendAll(minutes, sizeof(*minutes));
+    recvAll(&gSide, sizeof(gSide));
+    update();
+    if (gSide){
+        recvAll(&move, sizeof(move)); //get first move if black
+        doMove(&board, move);
+        update();
+    }
+    turn = TRUE;
+}
+void playHuman(){
+    if (!connected){
+        connected = TRUE;
+
+    }
+}
 #endif
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
 Button buttons[]={
@@ -326,7 +361,8 @@ Button buttons[]={
     {CHARPOS(0,5), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Play CPU", NULL},
     {CHARPOS(0,7), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Play Human", playHuman}
 };
-bool mouseMove(int x, int y){
+void mouseMove(int x, int y){
+    printf("mouseMove: %d %d\n",x,y);
     for (int i = 0; i < COUNT(buttons); i++){
         Button *b = buttons+i;
         if ((b->func) &&
@@ -336,20 +372,20 @@ bool mouseMove(int x, int y){
         (y < (b->y+b->height))){
             if (hoveredButton != b){
                 hoveredButton = b;
-                return TRUE;
+                update();
             }
-            return FALSE;
+            return;
         }
     }
     if (hoveredButton){
         hoveredButton = NULL;
-        return TRUE;
+        update();
     }
-    return FALSE;
 }
 Cell *selectedCell;
 char mousePos[32];
-bool mouseLeftDown(int x, int y){
+void mouseLeftDown(int x, int y){
+    printf("mouseLeftDown: %d %d\n",x,y);
     int cx = gSide ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
         cy = gSide ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
     if (cx < 8){
@@ -364,16 +400,16 @@ bool mouseLeftDown(int x, int y){
                 move = m;
                 selectedCell = NULL;
                 turn = FALSE;
-                CreateThread(NULL, 0, stepGame, NULL, 0, NULL);
+                //CreateThread(NULL, 0, stepGame, NULL, 0, NULL);
             }
         }
         sprintf(mousePos, "%d,%d", cx, cy);
     }
     if (hoveredButton) hoveredButton->func();
-    return TRUE;
+    update();
 }
-bool mouseRightDown(int x, int y){
-    return FALSE;
+void mouseRightDown(int x, int y){
+
 }
 void draw(){
     for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = BROWN;
@@ -427,13 +463,13 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         return DefWindowProc(hwnd, msg, wparam, lparam);
     }
     case WM_MOUSEMOVE:
-        if (mouseMove(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)) update();
+        mouseMove(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
         return 0;
     case WM_LBUTTONDOWN:
-        if (mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)) update();
+        mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
         return 0;
     case WM_RBUTTONDOWN:
-        if (mouseRightDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE)) update();
+        mouseRightDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
         return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -509,6 +545,64 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
         img
     );
     CGImageRelease(img);
+}
+- (BOOL)acceptsFirstMouse:(NSEvent *)event {
+    return YES;
+}
+- (void)mouseMoved:(NSEvent *)event {
+    NSPoint p = [event locationInWindow];
+    mouseMove(p.x, p.y);
+}
+- (void)mouseDown:(NSEvent *) event {
+    NSPoint p = [event locationInWindow];
+    mouseLeftDown(p.x, p.y);
+}
+- (void)rightMouseDown:(NSEvent *)event {
+    NSPoint p = [event locationInWindow];
+    mouseRightDown(p.x, p.y);
+}
+- (void)mouseUp:(NSEvent*)event {
+}
+- (void)rightMouseUp:(NSEvent*)event {
+}
+- (void)otherMouseDown:(NSEvent *)event {
+}
+- (void)otherMouseUp:(NSEvent *)event {
+}
+- (void)scrollWheel:(NSEvent *)event {
+}
+- (void)mouseDragged:(NSEvent *)event {
+    [self mouseMoved:event];
+}
+- (void)rightMouseDragged:(NSEvent *)event {
+    [self mouseMoved:event];
+}
+- (void)otherMouseDragged:(NSEvent *)event {
+    [self mouseMoved:event];
+}
+- (void)mouseExited:(NSEvent *)event {
+    printf("mouse exit\n");
+}
+- (void)mouseEntered:(NSEvent *)event {
+    printf("mouse enter\n");
+}
+- (BOOL)canBecomeKeyView {
+    return YES;
+}
+- (NSView *)nextValidKeyView {
+    return self;
+}
+- (NSView *)previousValidKeyView {
+    return self;
+}
+- (BOOL)acceptsFirstResponder {
+    return YES;
+}
+- (void)viewDidMoveToWindow {
+}
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [super dealloc];
 }
 #pragma mark NSTextInputClient
 - (void)doCommandBySelector:(nonnull SEL)selector {
@@ -601,35 +695,28 @@ defer:(BOOL)deferCreation
 
 id applicationName;
 id window;
-int main(){
-    init();
+void update(){
     draw();
+    [[window contentView] setNeedsDisplay:YES];
+}
+int main(){
     @autoreleasepool{
         [NSApplication sharedApplication];
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    applicationName = [[NSProcessInfo processInfo] processName];
-    window = [[FBWindow alloc] initWithContentRect:NSMakeRect(0, 0, WND_WIDTH, WND_HEIGHT)
-        styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable
-        backing:NSBackingStoreBuffered defer:NO];
-    [window center];
-    [window setTitle: applicationName];
-    NSAppearance* appearance = [NSAppearance appearanceNamed:NSAppearanceNameVibrantDark];
-    [window setAppearance:appearance];
-    [window makeKeyAndOrderFront:nil];
-    [NSApp activateIgnoringOtherApps:YES];
-    while (1){
-        NSEvent* event;
-        @autoreleasepool {
-            do {
-                event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
-                if (event) {
-                    [NSApp sendEvent:event];
-                }
-            } while (event);
-        }
-        [[window contentView] setNeedsDisplay:YES];
-        //usleep(1000);
-    }
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        applicationName = [[NSProcessInfo processInfo] processName];
+        window = [[FBWindow alloc] initWithContentRect:NSMakeRect(0, 0, WND_WIDTH, WND_HEIGHT)
+            styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable
+            backing:NSBackingStoreBuffered defer:NO];
+        [window center];
+        [window setTitle: applicationName];
+        NSAppearance* appearance = [NSAppearance appearanceNamed:NSAppearanceNameVibrantDark];
+        [window setAppearance:appearance];
+        [window makeKeyAndOrderFront:nil];
+        [window setAcceptsMouseMovedEvents:YES];
+        [NSApp activateIgnoringOtherApps:YES];
+        init();
+        update();
+        [NSApp run];
     }
     return 0;
 }
