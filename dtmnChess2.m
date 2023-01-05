@@ -30,6 +30,44 @@ typedef i8 bool;
 #define WND_HEIGHT (SCALE*HEIGHT)
 u32 frameBuffer[WIDTH*HEIGHT];
 #define FAT(x,y) ((y)*WIDTH + (x))
+#if _WIN32
+#undef UNICODE
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <dwmapi.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment (lib, "Ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
+#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
+#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+struct BMI {
+    BITMAPINFOHEADER    bmiHeader;
+    RGBQUAD             bmiColors[3];
+} bmi;
+HDC hdc;
+bool socketReady = FALSE;
+SOCKET sock;
+struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
+#elif __APPLE__
+#include <Cocoa/Cocoa.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <pthread.h>
+id window;
+int sock;
+#endif
+void sendAll(u8 *b, int c){
+    int p = 0;
+    while (p < c) p += send(sock, b+p, c-p, 0);
+}
+void recvAll(u8 *b, int c){
+    int p = 0;
+    while (p < c) p += recv(sock, b+p, c-p, 0);
+}
 char title[] = "dtmnChess";
 #define GLYPH_WIDTH 6
 #define GLYPH_HEIGHT 8
@@ -247,125 +285,8 @@ void incCpuLvl(){
     }
 }
 bool connected;
-void update();
-#if _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment (lib, "Ws2_32.lib")
-#pragma comment (lib, "Mswsock.lib")
-#pragma comment (lib, "AdvApi32.lib")
-SOCKET sock;
-void sendAll(u8 *b, int c){
-    int p = 0;
-    while (p < c) p += send(s, b+p, c-p, 0);
-}
-void recvAll(u8 *b, int c){
-    int p = 0;
-    while (p < c) p += recv(s, b+p, c-p, 0);
-}
-u8 buf[512];
-struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
-void findGame(){
-    WSADATA wsaData;
-    struct addrinfo *result = NULL,
-                    *ptr = NULL;
-    WSAStartup(MAKEWORD(2,2), &wsaData);
-    getaddrinfo("surnd.net", "6464", &hints, &result);
-    for (ptr=result; ptr != NULL; ptr=ptr->ai_next){
-        sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-        if (SOCKET_ERROR != connect(sock, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
-        closesocket(sock);
-    }
-    freeaddrinfo(result);
-    sendAll(minutes, sizeof(*minutes));
-    recvAll(&gSide, sizeof(gSide));
-    update();
-    if (gSide){
-        recvAll(&move, sizeof(move)); //get first move if black
-        doMove(&board, move);
-        update();
-    }
-    turn = TRUE;
-}
-void closeGame(){
-    closesocket(sock);
-    WSACleanup();
-    connected = FALSE;
-}
-void stepGame(){
-    sendAll(&move, sizeof(move));
-    if (checkWin(gSide)) closeGame();
-    else {
-        recvAll(&move, sizeof(move));
-        doMove(&board, move);
-        if (checkWin(!gSide)) closeGame();
-    }
-    update();
-    turn = TRUE;
-}
-void playHuman(){
-    if (!connected){
-        connected = TRUE;
-        CreateThread(NULL, 0, findGame, NULL, 0, NULL);
-    }
-}
-#elif __APPLE__
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <pthread.h>
-int sock;
-void sendAll(u8 *b, int c){
-    int p = 0;
-    while (p < c) p += send(sock, b+p, c-p, 0);
-}
-void recvAll(u8 *b, int c){
-    int p = 0;
-    while (p < c) p += recv(sock, b+p, c-p, 0);
-}
-void findGame(){
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    struct hostent *he = gethostbyname("surnd.net");
-    struct sockaddr_in sa;
-    memcpy(&sa.sin_addr, he->h_addr_list, sizeof(sa.sin_addr));
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(6464);
-    connect(sock, &sa, sizeof(sa));
-    sendAll(minutes, sizeof(*minutes));
-    recvAll(&gSide, sizeof(gSide));
-    update();
-    if (gSide){
-        recvAll(&move, sizeof(move)); //get first move if black
-        doMove(&board, move);
-        update();
-    }
-    turn = TRUE;
-}
-void closeGame(){
-    close(sock);
-    connected = FALSE;
-}
-void stepGame(){
-    sendAll(&move, sizeof(move));
-    if (checkWin(gSide)) closeGame();
-    else {
-        recvAll(&move, sizeof(move));
-        doMove(&board, move);
-        if (checkWin(!gSide)) closeGame();
-    }
-    update();
-    turn = TRUE;
-}
-void playHuman(){
-    if (!connected){
-        connected = TRUE;
-        pthread_create(NULL, NULL, findGame, NULL);
-    }
-}
-#endif
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
+void playHuman();
 Button buttons[]={
     {CHARPOS(0,0), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Minutes:", NULL},
     {CHARPOS(0,1), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, minutesStr, NULL},
@@ -378,6 +299,88 @@ Button buttons[]={
     {CHARPOS(0,5), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Play CPU", NULL},
     {CHARPOS(0,7), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Play Human", playHuman}
 };
+char mousePos[32];
+void draw(){
+    for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = BROWN;
+    for (int y = 0; y < 8; y++){
+        for (int x = 0; x < 8; x++){
+            int scrY = gSide ? y : 7-y,
+                scrX = gSide ? 7-x : x;
+            drawSquare(scrX*CELL_WIDTH,scrY*CELL_WIDTH, (scrX%2)^(scrY%2) ? BOARD_GREEN : BOARD_WHITE);
+            Cell c = board.arr[BAT(x,y)];
+            if (c.piece) drawPieceOnCell(c.piece, pieceColors[c.side], scrX, scrY);
+        }
+    }
+    drawString(0,0, mousePos);
+    if (won == gSide) drawString(50,50, "You won");
+    else if (won == !gSide) drawString(50,50, "You lost");
+    for (int i = 0; i < COUNT(buttons); i++) drawButton(buttons+i);
+#if _WIN32
+    StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
+#elif __APPLE__
+    [[window contentView] setNeedsDisplay:YES];
+#endif
+}
+void findGame(){
+#if _WIN32
+    struct addrinfo *result = NULL,
+                    *ptr = NULL;
+    getaddrinfo("surnd.net", "6464", &hints, &result);
+    for (ptr=result; ptr != NULL; ptr=ptr->ai_next){
+        sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+        if (SOCKET_ERROR != connect(sock, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
+        closesocket(sock);
+    }
+    freeaddrinfo(result);
+#elif __APPLE__
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    struct hostent *he = gethostbyname("surnd.net");
+    struct sockaddr_in sa;
+    memcpy(&sa.sin_addr, he->h_addr_list, sizeof(sa.sin_addr));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(6464);
+    connect(sock, &sa, sizeof(sa));
+#endif
+    sendAll(minutes, sizeof(*minutes));
+    recvAll(&gSide, sizeof(gSide));
+    draw();
+    if (gSide){
+        recvAll(&move, sizeof(move)); //get first move if black
+        doMove(&board, move);
+        draw();
+    }
+    turn = TRUE;
+}
+void closeGame(){
+#if _WIN32
+    closesocket(sock);
+    WSACleanup();
+#elif __APPLE__
+    close(sock);
+#endif
+    connected = FALSE;
+}
+void stepGame(){
+    sendAll(&move, sizeof(move));
+    if (checkWin(gSide)) closeGame();
+    else {
+        recvAll(&move, sizeof(move));
+        doMove(&board, move);
+        if (checkWin(!gSide)) closeGame();
+    }
+    draw();
+    turn = TRUE;
+}
+void playHuman(){
+    if (!connected){
+        connected = TRUE;
+#if _WIN32
+        CreateThread(NULL, 0, findGame, NULL, 0, NULL);
+#elif __APPLE__
+        pthread_create(NULL, NULL, findGame, NULL);
+#endif
+    }
+}
 void mouseMove(int x, int y){
     for (int i = 0; i < COUNT(buttons); i++){
         Button *b = buttons+i;
@@ -388,18 +391,17 @@ void mouseMove(int x, int y){
         (y < (b->y+b->height))){
             if (hoveredButton != b){
                 hoveredButton = b;
-                update();
+                draw();
             }
             return;
         }
     }
     if (hoveredButton){
         hoveredButton = NULL;
-        update();
+        draw();
     }
 }
 Cell *selectedCell;
-char mousePos[32];
 void mouseLeftDown(int x, int y){
     int cx = gSide ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
         cy = gSide ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
@@ -425,46 +427,13 @@ void mouseLeftDown(int x, int y){
         sprintf(mousePos, "%d,%d", cx, cy);
     }
     if (hoveredButton) hoveredButton->func();
-    update();
+    draw();
 }
 void mouseRightDown(int x, int y){
-
-}
-void draw(){
-    for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = BROWN;
-    for (int y = 0; y < 8; y++){
-        for (int x = 0; x < 8; x++){
-            int scrY = gSide ? y : 7-y,
-                scrX = gSide ? 7-x : x;
-            drawSquare(scrX*CELL_WIDTH,scrY*CELL_WIDTH, (scrX%2)^(scrY%2) ? BOARD_GREEN : BOARD_WHITE);
-            Cell c = board.arr[BAT(x,y)];
-            if (c.piece) drawPieceOnCell(c.piece, pieceColors[c.side], scrX, scrY);
-        }
-    }
-    drawString(0,0, mousePos);
-    if (won == gSide) drawString(50,50, "You won");
-    else if (won == !gSide) drawString(50,50, "You lost");
-    for (int i = 0; i < COUNT(buttons); i++) drawButton(buttons+i);
 }
 void charInput(char c){
-
 }
 #if _WIN32
-#undef UNICODE
-#include <windows.h>
-#include <dwmapi.h>
-#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
-#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
-#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
-struct BMI {
-    BITMAPINFOHEADER    bmiHeader;
-    RGBQUAD             bmiColors[3];
-} bmi;
-HDC hdc;
-void update(){
-    draw();
-    StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
-}
 LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
     BOOL t = TRUE;
     switch (msg){
@@ -500,10 +469,16 @@ WNDCLASSA wc = {0,WindowProc,0,0,NULL,NULL,NULL,NULL,NULL,title};
 HWND wnd;
 MSG msg;
 RECT wr;
+void startWSA(){
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2,2), &wsaData);
+    socketReady = TRUE;
+}
 int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int nCmdShow){
-    AllocConsole();
+    /*AllocConsole();
     FILE* fDummy;
-    freopen_s(&fDummy, "CONOUT$", "w", stdout);
+    freopen_s(&fDummy, "CONOUT$", "w", stdout);*/
+    CreateThread(NULL, 0, startWSA, NULL, 0, NULL);
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = 32;
@@ -524,7 +499,7 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW^WS_THICKFRAME,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
     hdc = GetDC(wnd);
     init();
-    update();
+    draw();
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
@@ -532,7 +507,6 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
     return msg.wParam;
 }
 #elif __APPLE__
-#import <Cocoa/Cocoa.h>
 @interface FBView : NSView<NSTextInputClient>
 @end
 @implementation FBView
@@ -713,11 +687,6 @@ defer:(BOOL)deferCreation
 @end
 
 id applicationName;
-id window;
-void update(){
-    draw();
-    [[window contentView] setNeedsDisplay:YES];
-}
 int main(){
     @autoreleasepool{
         [NSApplication sharedApplication];
@@ -734,7 +703,7 @@ int main(){
         [window setAcceptsMouseMovedEvents:YES];
         [NSApp activateIgnoringOtherApps:YES];
         init();
-        update();
+        draw();
         [NSApp run];
     }
     return 0;
