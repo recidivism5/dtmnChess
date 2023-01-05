@@ -362,7 +362,6 @@ Button buttons[]={
     {CHARPOS(0,7), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Play Human", playHuman}
 };
 void mouseMove(int x, int y){
-    printf("mouseMove: %d %d\n",x,y);
     for (int i = 0; i < COUNT(buttons); i++){
         Button *b = buttons+i;
         if ((b->func) &&
@@ -385,7 +384,6 @@ void mouseMove(int x, int y){
 Cell *selectedCell;
 char mousePos[32];
 void mouseLeftDown(int x, int y){
-    printf("mouseLeftDown: %d %d\n",x,y);
     int cx = gSide ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
         cy = gSide ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
     if (cx < 8){
@@ -551,15 +549,15 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
 }
 - (void)mouseMoved:(NSEvent *)event {
     NSPoint p = [event locationInWindow];
-    mouseMove(p.x, p.y);
+    mouseMove(p.x/SCALE, HEIGHT-p.y/SCALE);
 }
 - (void)mouseDown:(NSEvent *) event {
     NSPoint p = [event locationInWindow];
-    mouseLeftDown(p.x, p.y);
+    mouseLeftDown(p.x/SCALE, HEIGHT-p.y/SCALE);
 }
 - (void)rightMouseDown:(NSEvent *)event {
     NSPoint p = [event locationInWindow];
-    mouseRightDown(p.x, p.y);
+    mouseRightDown(p.x/SCALE, HEIGHT-p.y/SCALE);
 }
 - (void)mouseUp:(NSEvent*)event {
 }
