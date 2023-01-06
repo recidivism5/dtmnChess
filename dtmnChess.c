@@ -165,9 +165,6 @@ void drawPiece(u16 *piece, u32 color, int x, int y){
 void drawPieceOnCell(u16 *piece, u32 color, int x, int y){
     drawPiece(piece, color, x*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, y*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
 }
-void init(){
-    setBoard();
-}
 bool moveLegal(Cell *b, int x, int y, int tx, int ty){
     Cell *start = b + BAT(x,y);
     Cell *target = b + BAT(tx,ty);
@@ -301,20 +298,38 @@ void incCpuLvl(){
     }
 }
 bool connected;
+void decTheme();
+void incTheme();
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
 void playHuman();
 Button buttons[]={
-    {CHARPOS(0,0), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Minutes:", NULL},
-    {CHARPOS(0,1), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, minutesStr, NULL},
-    {2+CHARPOS(2,1), GLYPH_WIDTH, GLYPH_HEIGHT, "<", decMinutes},
-    {2+CHARPOS(13,1), GLYPH_WIDTH, GLYPH_HEIGHT, ">", incMinutes},
-    {CHARPOS(0,2), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "CPU Lvl:", NULL},
-    {CHARPOS(0,3), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, cpuLvlStr, NULL},
-    {2+CHARPOS(2,3), GLYPH_WIDTH, GLYPH_HEIGHT, "<", decCpuLvl},
-    {2+CHARPOS(13,3), GLYPH_WIDTH, GLYPH_HEIGHT, ">", incCpuLvl},
-    {CHARPOS(0,5), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Play CPU", NULL},
-    {CHARPOS(0,7), RIGHT_PANEL_WIDTH, GLYPH_HEIGHT, "Play Human", playHuman}
+    CHARPOS(0,0),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Minutes:",NULL,
+    CHARPOS(0,1),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,minutesStr,NULL,
+    2+CHARPOS(2,1),GLYPH_WIDTH,GLYPH_HEIGHT,"<",decMinutes,
+    2+CHARPOS(13,1),GLYPH_WIDTH,GLYPH_HEIGHT,">",incMinutes,
+    CHARPOS(0,2),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"CPU Lvl:",NULL,
+    CHARPOS(0,3),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT, cpuLvlStr,NULL,
+    2+CHARPOS(2,3),GLYPH_WIDTH,GLYPH_HEIGHT,"<",decCpuLvl,
+    2+CHARPOS(13,3),GLYPH_WIDTH,GLYPH_HEIGHT,">",incCpuLvl,
+    CHARPOS(0,5),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Play CPU",NULL,
+    CHARPOS(0,7),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Play Human",playHuman,
+    CHARPOS(0,10),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Theme:",NULL,
+    CHARPOS(0,11),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,NULL,NULL,
+    2+CHARPOS(2,11),GLYPH_WIDTH,GLYPH_HEIGHT,"<",decTheme,
+    2+CHARPOS(13,11),GLYPH_WIDTH,GLYPH_HEIGHT,">",incTheme,
 };
+void decTheme(){
+    if (theme-themes > 0){
+        theme--;
+        buttons[11].str = theme->name;
+    }
+}
+void incTheme(){
+    if (theme-themes+1 < COUNT(themes)){
+        theme++;
+        buttons[11].str = theme->name;
+    }
+}
 char mousePos[32];
 void draw(){
     for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = theme->rightPanel;
@@ -450,6 +465,10 @@ void mouseLeftDown(int x, int y){
 void mouseRightDown(int x, int y){
 }
 void charInput(char c){
+}
+void init(){
+    setBoard();
+    buttons[11].str = theme->name;
 }
 #if _WIN32
 LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
