@@ -14,8 +14,8 @@ typedef i8 bool;
 #define BACKGROUND_COLOR 0
 typedef struct Theme {
     char *name;
-    u32 board0,board1,
-    piece0,piece1,
+    u32 board[2],
+    piece[2],
     rightPanel,
     hover,
     text;
@@ -123,7 +123,6 @@ typedef struct Board {
 Board board;
 #define BAT(x,y) ((y)*8 + (x))
 bool gSide;
-u32 pieceColors[2] = {WHITE, RED};
 typedef struct Move {
     i8 x,y,tx,ty;
 }Move;
@@ -274,7 +273,7 @@ typedef struct Button {
 }Button;
 Button *hoveredButton;
 void drawButton(Button *b){
-    if (hoveredButton == b) fillRect(b->x, b->y, b->width, b->height, LIGHT_BROWN);
+    if (hoveredButton == b) fillRect(b->x, b->y, b->width, b->height, theme->hover);
     int strpx = strlen(b->str)*6;
     drawString(b->x+b->width/2-strpx/2, b->y+b->height/2-8/2, b->str);
 }
@@ -324,14 +323,14 @@ Button buttons[]={
 };
 char mousePos[32];
 void draw(){
-    for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = BROWN;
+    for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = theme->rightPanel;
     for (int y = 0; y < 8; y++){
         for (int x = 0; x < 8; x++){
             int scrY = gSide ? y : 7-y,
                 scrX = gSide ? 7-x : x;
-            drawSquare(scrX*CELL_WIDTH,scrY*CELL_WIDTH, (scrX%2)^(scrY%2) ? BOARD_GREEN : BOARD_WHITE);
+            drawSquare(scrX*CELL_WIDTH,scrY*CELL_WIDTH, theme->board[(scrX%2)^(scrY%2)]);
             Cell c = board.arr[BAT(x,y)];
-            if (c.piece) drawPieceOnCell(c.piece, pieceColors[c.side], scrX, scrY);
+            if (c.piece) drawPieceOnCell(c.piece, theme->piece[c.side], scrX, scrY);
         }
     }
     drawString(0,0, mousePos);
@@ -569,15 +568,15 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
 }
 - (void)mouseMoved:(NSEvent *)event {
     NSPoint p = [event locationInWindow];
-    mouseMove(p.x/SCALE, HEIGHT-p.y/SCALE);
+    mouseMove(p.x/SCALE, HEIGHT-(p.y/SCALE);
 }
 - (void)mouseDown:(NSEvent *) event {
     NSPoint p = [event locationInWindow];
-    mouseLeftDown(p.x/SCALE, HEIGHT-p.y/SCALE);
+    mouseLeftDown(p.x/SCALE, HEIGHT-(p.y+2)/SCALE);
 }
 - (void)rightMouseDown:(NSEvent *)event {
     NSPoint p = [event locationInWindow];
-    mouseRightDown(p.x/SCALE, HEIGHT-p.y/SCALE);
+    mouseRightDown(p.x/SCALE, HEIGHT-(p.y+2)/SCALE);
 }
 - (void)mouseUp:(NSEvent*)event {
 }
