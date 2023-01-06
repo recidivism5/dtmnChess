@@ -112,6 +112,9 @@ typedef struct Cell {
     bool side;
 }Cell;
 typedef struct Board {
+    bool kingMoved[2];
+    bool loRookMoved[2];
+    bool hiRookMoved[2];
     Cell arr[8*8];
 }Board;
 Board board;
@@ -148,6 +151,8 @@ void setBoard(){
         setCell(x, 1, pawn, 0);
         setCell(x, 6, pawn, 1);
     }
+    board.kingMoved[0] = FALSE;
+    board.kingMoved[1] = FALSE;
 }
 void drawSquare(int x, int y, u32 color){
      for (int j = 0; j < CELL_WIDTH; j++)
@@ -439,24 +444,27 @@ void mouseLeftDown(int x, int y){
         cy = gSide ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
     if (cx < 8){
         Cell *c = board.arr + BAT(cx,cy);
-        if (c->piece && (gSide == c->side)) selectedCell = c;
-        else if (selectedCell){
+        if (selectedCell){
             int x = (selectedCell-board.arr) % 8,
                 y = (selectedCell-board.arr) / 8;
             Move m = {x,y,cx,cy};
-            if ((won < 0) && turn && moveLegalChecked(m)){
+            if ((!connected && moveLegal(board.arr, m.x,m.y,m.tx,m.ty)) ||
+            (connected && (won < 0) && turn && moveLegalChecked(m))){
                 doMove(&board, m);
                 move = m;
                 selectedCell = NULL;
                 turn = FALSE;
-                #if _WIN32
-                CreateThread(NULL, 0, stepGame, NULL, 0, NULL);
-                #elif __APPLE__
-                pthread_t pt;
-                pthread_create(&pt, NULL, stepGame, NULL);
-                #endif
+                if (connected){
+                    #if _WIN32
+                    CreateThread(NULL, 0, stepGame, NULL, 0, NULL);
+                    #elif __APPLE__
+                    pthread_t pt;
+                    pthread_create(&pt, NULL, stepGame, NULL);
+                    #endif
+                }
             }
         }
+        else if (c->piece && (!connected || (gSide == c->side))) selectedCell = c;
         sprintf(mousePos, "%d,%d", cx, cy);
     }
     if (hoveredButton) hoveredButton->func();
