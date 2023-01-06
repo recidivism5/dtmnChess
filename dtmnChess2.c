@@ -56,13 +56,23 @@ struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 #include <pthread.h>
+#include <errno.h>
 id window;
 int sock;
 #endif
 void sendAll(u8 *b, int c){
     int p = 0;
-    while (p < c) p += send(sock, b+p, c-p, 0);
+    while (p < c){
+        printf("sendingAll: %d %d\n",p, c-p);
+        int r = send(sock, b+p, c-p, 0);
+        if (r <= 0){
+            printf("send error\n");
+            exit(1);
+        }
+        p += r;
+    }
 }
 void recvAll(u8 *b, int c){
     int p = 0;
@@ -336,16 +346,17 @@ void findGame(){
     sock = socket(AF_INET, SOCK_STREAM, 0);
     struct hostent *he = gethostbyname("surnd.net");
     struct sockaddr_in sa;
-    memcpy(&sa.sin_addr, he->h_addr_list, sizeof(sa.sin_addr));
+    sa.sin_addr = *((struct in_addr *)he->h_addr);
+    //printf("%s\n", inet_ntoa(sa.sin_addr));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(6464);
-    connect(sock, &sa, sizeof(sa));
+    if(0 > connect(sock, &sa, sizeof(sa))) perror("connect failed: ");
 #endif
-    sendAll(minutes, sizeof(*minutes));
-    recvAll(&gSide, sizeof(gSide));
+    send(sock, minutes, sizeof(*minutes), 0);
+    recv(sock, &gSide, sizeof(gSide), 0);
     draw();
     if (gSide){
-        recvAll(&move, sizeof(move)); //get first move if black
+        recv(sock, &move, sizeof(move), 0); //get first move if black
         doMove(&board, move);
         draw();
     }
@@ -361,10 +372,10 @@ void closeGame(){
     connected = FALSE;
 }
 void stepGame(){
-    sendAll(&move, sizeof(move));
+    send(sock, &move, sizeof(move), 0);
     if (checkWin(gSide)) closeGame();
     else {
-        recvAll(&move, sizeof(move));
+        recv(sock, &move, sizeof(move), 0);
         doMove(&board, move);
         if (checkWin(!gSide)) closeGame();
     }
@@ -377,7 +388,8 @@ void playHuman(){
 #if _WIN32
         CreateThread(NULL, 0, findGame, NULL, 0, NULL);
 #elif __APPLE__
-        pthread_create(NULL, NULL, findGame, NULL);
+        pthread_t pt;
+        pthread_create(&pt, NULL, findGame, NULL);
 #endif
     }
 }
@@ -420,7 +432,8 @@ void mouseLeftDown(int x, int y){
                 #if _WIN32
                 CreateThread(NULL, 0, stepGame, NULL, 0, NULL);
                 #elif __APPLE__
-                pthread_create(NULL, NULL, stepGame, NULL);
+                pthread_t pt;
+                pthread_create(&pt, NULL, stepGame, NULL);
                 #endif
             }
         }
@@ -428,6 +441,7 @@ void mouseLeftDown(int x, int y){
     }
     if (hoveredButton) hoveredButton->func();
     draw();
+    printf("click done\n");
 }
 void mouseRightDown(int x, int y){
 }

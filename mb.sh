@@ -1,1 +1,1 @@
-clang -framework Cocoa -x objective-c -Os $1.m -o $1
+clang -framework Cocoa -x objective-c -Os $1 -o $2
