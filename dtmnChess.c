@@ -25,13 +25,7 @@ Theme themes[]={
     "Bee",0xbcaf00,0x343001,0xf0dc00,0x474100,0x343001,0x685f00,0xf0dc00,
 };
 Theme *theme = themes+1;
-#define WHITE 0x00ffffff
-#define RED 0x00990000
-#define BROWN 0x00160e09
-#define LIGHT_BROWN 0x004e321f
 #define SHADOW 0
-#define BOARD_GREEN 0x00006400
-#define BOARD_WHITE 0x00b4b4b4
 #define PIECE_WIDTH 16
 #define CELL_WIDTH 20
 #define BOARD_WIDTH (CELL_WIDTH*8)
@@ -568,7 +562,7 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
 }
 - (void)mouseMoved:(NSEvent *)event {
     NSPoint p = [event locationInWindow];
-    mouseMove(p.x/SCALE, HEIGHT-(p.y/SCALE);
+    mouseMove(p.x/SCALE, HEIGHT-(p.y+2)/SCALE);
 }
 - (void)mouseDown:(NSEvent *) event {
     NSPoint p = [event locationInWindow];
