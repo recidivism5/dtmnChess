@@ -1,1 +1,1 @@
-clang -framework Cocoa -x objective-c -Os $1 -o $2
+clang -ferror-limit=1 -framework Cocoa -x objective-c -Os $1 -o $2

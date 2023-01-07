@@ -13,6 +13,8 @@ typedef bool Side;
 #define TRUE 1
 #define FALSE 0
 #define COUNT(arr) (sizeof(arr)/sizeof(*arr))
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
 typedef enum Piece {none,pawn,rook,knight,bishop,queen,king}Piece;
 typedef enum Flag {
     turn = 1,
@@ -32,13 +34,13 @@ void setFlag(Board *b, Flag f, bool v){
     b->flags = (b->flags & ~f) | v ? f : 0;
 }
 u8 cell(Side s, Piece p){
-    return s<<3 & p;
+    return s<<3 | p;
 }
 u8 getCell(Board *b, int x, int y){
     return b->arr[y] >> (x*4) & 0xf;
 }
 void setCell(Board *b, int x, int y, u8 c){
-    b->arr[y] = (b->arr[y] & ~(0xf << x*4)) | (c << (x*4));
+    b->arr[y] = (b->arr[y] & ~(0xf << (x*4))) | (c << (x*4));
 }
 Side side(u8 c){
     return c >> 3;
@@ -257,7 +259,7 @@ typedef struct Theme {
         text;
 }Theme;
 Theme themes[]={
-    "Classic",0xbeb6a8,0x3c673b,0xeae4db,0x458245,0x342a1f,0x493b2b,0x34ec40,
+    "Classic",0xbeb6a8,0x3c673b,0xeae4db,0x458245,0x3c673b,0x4f884e,0xbeb6a8,
     "Bee",0xbcaf00,0x343001,0xf0dc00,0x474100,0x343001,0x685f00,0xf0dc00,
 };
 Theme *theme = themes+1;
@@ -321,6 +323,13 @@ void drawString(int x, int y, char *str){
         str++;
     }
 }
+void fillRect(int x, int y, int width, int height, u32 color){
+    for (int j = 0; j < height; j++){
+        for (int i = 0; i < width; i++){
+            frameBuffer[FAT(x+i,y+j)] = color;
+        }
+    }
+}
 u16 pawnImg[]={0x00,0x00,0x00,0x3C0,0x7E0,0x7E0,0x7E0,0x3C0,0x180,0x180,0x3C0,0x3C0,0x7E0,0x1FF8,0x3FFC,0x3FFC,};
 u16 rookImg[]={0x00,0x00,0x1248,0x1FF8,0xFF0,0x7E0,0x7E0,0x7E0,0x7E0,0x7E0,0xFF0,0xFF0,0xFF0,0xFF0,0x3FFC,0x3FFC,};
 u16 knightImg[]={0x00,0x20,0x60,0x3F0,0xFF8,0xFD8,0x1FFC,0x1FFE,0x1E7E,0x1E2E,0x1F00,0xFC0,0xFE0,0xFF0,0x3FFC,0x3FFC,};
@@ -328,6 +337,14 @@ u16 bishopImg[]={0x00,0x00,0x3C0,0x180,0x3C0,0x3E0,0x1E0,0xCF0,0xEF0,0xFF0,0xFF0
 u16 queenImg[]={0x00,0x00,0x420,0xE70,0x420,0x660,0x27E4,0x77EE,0x27E4,0x3FFC,0x1FF8,0x1FF8,0xFF0,0x7E0,0x3FFC,0x3FFC,};
 u16 kingImg[]={0x00,0x180,0x180,0x7E0,0x7E0,0x180,0xDB0,0x1BD8,0x318C,0x318C,0x318C,0x1998,0xDB0,0xFF0,0x3FFC,0x3FFC,};
 u16 *pieceImgs[6] = {pawnImg,rookImg,knightImg,bishopImg,queenImg,kingImg};
+void drawPiece(u16 *img, u32 color, int x, int y){
+    for (int j = 0; j < PIECE_WIDTH; j++)
+        for (int i = 0; i < PIECE_WIDTH; i++)
+            if (img[j] & (1<<i)){
+                frameBuffer[(y+j)*WIDTH + x+i] = color;
+                frameBuffer[(y+j+1)*WIDTH + x+i+1] = SHADOW;
+            }
+}
 Board board;
 bool gSide;
 Move move;
@@ -337,29 +354,6 @@ enum Game{
     gameHuman
 }game = gameNone;
 int won = -1; // -1:none, 0:0 won, 1:1 won
-void drawSquare(int x, int y, u32 color){
-     for (int j = 0; j < CELL_WIDTH; j++)
-        for (int i = 0; i < CELL_WIDTH; i++)
-            frameBuffer[(y+j)*WIDTH + x+i] = color;
-}
-void drawPiece(u16 *piece, u32 color, int x, int y){
-    for (int j = 0; j < PIECE_WIDTH; j++)
-        for (int i = 0; i < PIECE_WIDTH; i++)
-            if (piece[j] & (1<<i)){
-                frameBuffer[(y+j)*WIDTH + x+i] = color;
-                frameBuffer[(y+j+1)*WIDTH + x+i+1] = SHADOW;
-            }
-}
-void drawPieceOnCell(u16 *piece, u32 color, int x, int y){
-    drawPiece(piece, color, x*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, y*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
-}
-void fillRect(int x, int y, int width, int height, u32 color){
-    for (int j = 0; j < height; j++){
-        for (int i = 0; i < width; i++){
-            frameBuffer[FAT(x+i,y+j)] = color;
-        }
-    }
-}
 typedef struct Button {
     int x,y,width,height;
     char *str;
@@ -401,7 +395,7 @@ void incCpuLvl(){
     }
 }
 void playCPU(){
-    setBoard();
+    setBoard(&board);
     game = gameCPU;
     gSide = rand() % 2;
 }
@@ -444,9 +438,9 @@ void draw(){
         for (int x = 0; x < 8; x++){
             int scrY = gSide ? y : 7-y,
                 scrX = gSide ? 7-x : x;
-            drawSquare(scrX*CELL_WIDTH,scrY*CELL_WIDTH, theme->board[(scrX%2)^(scrY%2)]);
-            Cell c = board.arr[BAT(x,y)];
-            if (c.piece) drawPieceOnCell(c.piece, theme->piece[c.side], scrX, scrY);
+            fillRect(scrX*CELL_WIDTH,scrY*CELL_WIDTH, CELL_WIDTH,CELL_WIDTH, theme->board[(scrX%2)^(scrY%2)]);
+            u8 c = getCell(&board, x,y);
+            if (piece(c)) drawPiece(pieceImgs[piece(c)-1], theme->piece[side(c)], scrX*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, scrY*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
         }
     }
     drawString(0,0, mousePos);
@@ -487,7 +481,6 @@ void findGame(){
         doMove(&board, move);
         draw();
     }
-    turn = TRUE;
 }
 void closeGame(){
 #if _WIN32
@@ -500,14 +493,13 @@ void closeGame(){
 }
 void stepGame(){
     send(sock, &move, sizeof(move), 0);
-    if (checkWin(gSide)) closeGame();
+    if (checkWin(&board, gSide)) closeGame();
     else {
         recv(sock, &move, sizeof(move), 0);
         doMove(&board, move);
-        if (checkWin(!gSide)) closeGame();
+        if (checkWin(&board, !gSide)) closeGame();
     }
     draw();
-    turn = TRUE;
 }
 void playHuman(){
     if (game == gameNone){
@@ -540,11 +532,13 @@ void mouseMove(int x, int y){
         draw();
     }
 }
-Cell *selectedCell;
+Move userMove = {-1};
 void mouseLeftDown(int x, int y){
     int cx = gSide ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
         cy = gSide ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
     if (cx < 8){
+        u8 c = getCell(&board, cx,cy);
+        /*
         Cell *c = board.arr + BAT(cx,cy);
         if (selectedCell){
             int x = (selectedCell-board.arr) % 8,
@@ -570,7 +564,7 @@ void mouseLeftDown(int x, int y){
             }
         }
         else if (c->piece && (game==gameNone || (gSide == c->side))) selectedCell = c;
-        sprintf(mousePos, "%d,%d", cx, cy);
+        sprintf(mousePos, "%d,%d", cx, cy);*/
     }
     if (hoveredButton) hoveredButton->func();
     draw();
@@ -580,7 +574,7 @@ void mouseRightDown(int x, int y){
 void charInput(char c){
 }
 void init(){
-    setBoard();
+    setBoard(&board);
     buttons[11].str = theme->name;
 }
 #if _WIN32
