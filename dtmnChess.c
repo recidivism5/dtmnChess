@@ -2,12 +2,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef int8_t i8;
 typedef int32_t i32;
 typedef i8 bool;
+typedef bool Side;
 #define TRUE 1
 #define FALSE 0
 #define COUNT(arr) (sizeof(arr)/sizeof(*arr))
@@ -15,10 +17,10 @@ typedef i8 bool;
 typedef struct Theme {
     char *name;
     u32 board[2],
-    piece[2],
-    rightPanel,
-    hover,
-    text;
+        piece[2],
+        rightPanel,
+        hover,
+        text;
 }Theme;
 Theme themes[]={
     "Classic",0xbeb6a8,0x3c673b,0xeae4db,0x458245,0x342a1f,0x493b2b,0x34ec40,
@@ -69,22 +71,6 @@ struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
 id window;
 int sock;
 #endif
-void sendAll(u8 *b, int c){
-    int p = 0;
-    while (p < c){
-        printf("sendingAll: %d %d\n",p, c-p);
-        int r = send(sock, b+p, c-p, 0);
-        if (r <= 0){
-            printf("send error\n");
-            exit(1);
-        }
-        p += r;
-    }
-}
-void recvAll(u8 *b, int c){
-    int p = 0;
-    while (p < c) p += recv(sock, b+p, c-p, 0);
-}
 char title[] = "dtmnChess";
 #define GLYPH_WIDTH 6
 #define GLYPH_HEIGHT 8
@@ -101,59 +87,248 @@ void drawString(int x, int y, char *str){
         str++;
     }
 }
-u16 pawn[]={0x00,0x00,0x00,0x3C0,0x7E0,0x7E0,0x7E0,0x3C0,0x180,0x180,0x3C0,0x3C0,0x7E0,0x1FF8,0x3FFC,0x3FFC,};
-u16 bishop[]={0x00,0x00,0x3C0,0x180,0x3C0,0x3E0,0x1E0,0xCF0,0xEF0,0xFF0,0xFF0,0xFF0,0x7E0,0x3C0,0x3FFC,0x3FFC,};
-u16 rook[]={0x00,0x00,0x1248,0x1FF8,0xFF0,0x7E0,0x7E0,0x7E0,0x7E0,0x7E0,0xFF0,0xFF0,0xFF0,0xFF0,0x3FFC,0x3FFC,};
-u16 knight[]={0x00,0x20,0x60,0x3F0,0xFF8,0xFD8,0x1FFC,0x1FFE,0x1E7E,0x1E2E,0x1F00,0xFC0,0xFE0,0xFF0,0x3FFC,0x3FFC,};
-u16 queen[]={0x00,0x00,0x420,0xE70,0x420,0x660,0x27E4,0x77EE,0x27E4,0x3FFC,0x1FF8,0x1FF8,0xFF0,0x7E0,0x3FFC,0x3FFC,};
-u16 king[]={0x00,0x180,0x180,0x7E0,0x7E0,0x180,0xDB0,0x1BD8,0x318C,0x318C,0x318C,0x1998,0xDB0,0xFF0,0x3FFC,0x3FFC,};
-typedef struct Cell {
-    u16 *piece;
-    bool side;
-}Cell;
+u16 pawnImg[]={0x00,0x00,0x00,0x3C0,0x7E0,0x7E0,0x7E0,0x3C0,0x180,0x180,0x3C0,0x3C0,0x7E0,0x1FF8,0x3FFC,0x3FFC,};
+u16 rookImg[]={0x00,0x00,0x1248,0x1FF8,0xFF0,0x7E0,0x7E0,0x7E0,0x7E0,0x7E0,0xFF0,0xFF0,0xFF0,0xFF0,0x3FFC,0x3FFC,};
+u16 knightImg[]={0x00,0x20,0x60,0x3F0,0xFF8,0xFD8,0x1FFC,0x1FFE,0x1E7E,0x1E2E,0x1F00,0xFC0,0xFE0,0xFF0,0x3FFC,0x3FFC,};
+u16 bishopImg[]={0x00,0x00,0x3C0,0x180,0x3C0,0x3E0,0x1E0,0xCF0,0xEF0,0xFF0,0xFF0,0xFF0,0x7E0,0x3C0,0x3FFC,0x3FFC,};
+u16 queenImg[]={0x00,0x00,0x420,0xE70,0x420,0x660,0x27E4,0x77EE,0x27E4,0x3FFC,0x1FF8,0x1FF8,0xFF0,0x7E0,0x3FFC,0x3FFC,};
+u16 kingImg[]={0x00,0x180,0x180,0x7E0,0x7E0,0x180,0xDB0,0x1BD8,0x318C,0x318C,0x318C,0x1998,0xDB0,0xFF0,0x3FFC,0x3FFC,};
+u16 *pieceImgs[6] = {pawnImg,rookImg,knightImg,bishopImg,queenImg,kingImg};
+typedef enum Piece {none,pawn,rook,knight,bishop,queen,king}Piece;
+typedef enum Flag {
+    turn = 1,
+    loRookMoved0 = 1<<1,
+    loRookMoved1 = 1<<2,
+    hiRookMoved0 = 1<<3,
+    hiRookMoved1 = 1<<4
+}Flag;
 typedef struct Board {
-    bool kingMoved[2];
-    bool loRookMoved[2];
-    bool hiRookMoved[2];
-    Cell arr[8*8];
+    u8 flags; //turn, loRookMoved[2], hiRookMoved[2]
+    u32 arr[8];
 }Board;
-Board board;
-#define BAT(x,y) ((y)*8 + (x))
-bool gSide;
+bool getFlag(Board *b, Flag f){
+    return !!(b->flags & f);
+}
+void setFlag(Board *b, Flag f, bool v){
+    b->flags = (b->flags & ~f) | v ? f : 0;
+}
+u8 cell(Side s, Piece p){
+    return s<<3 & p;
+}
+u8 getCell(Board *b, int x, int y){
+    return b->arr[y] >> (x*4) & 0xf;
+}
+void setCell(Board *b, int x, int y, u8 c){
+    b->arr[y] = (b->arr[y] & ~(0xf << x*4)) | (c << (x*4));
+}
+bool side(u8 c){
+    return c >> 3;
+}
+u8 piece(u8 c){
+    return c & 0b111;
+}
+void setRow(Board *b, int y, Side s){
+    setCell(b,0,y,cell(s,rook));
+    setCell(b,1,y,cell(s,knight));
+    setCell(b,2,y,cell(s,bishop));
+    setCell(b,3,y,cell(s,queen));
+    setCell(b,4,y,cell(s,king));
+    setCell(b,5,y,cell(s,bishop));
+    setCell(b,6,y,cell(s,knight));
+    setCell(b,7,y,cell(s,rook));
+}
+void setBoard(Board *b){
+    b->flags = 0;
+    for (int y = 2; y < 6; y++)
+        for (int x = 0; x < 8; x++)
+            setCell(b,x,y,0);
+    setRow(b, 0, 0);
+    setRow(b, 7, 1);
+    for (int x = 0; x < 8; x++){
+        setCell(b, x, 1, cell(0,pawn));
+        setCell(b, x, 6, cell(1,pawn));
+    }
+}
+bool moveLegal(Board *b, int x, int y, int tx, int ty){
+    u8 s = getCell(b, x,y), e = getCell(b, tx,ty);
+    if (((x==tx)&&(y==ty)) || (!piece(s)) || (side(s) != getFlag(b,turn)) || (piece(e) && (side(e) == side(s)))) return FALSE;
+    switch (piece(s)){
+        case pawn: return ((side(s) ? ty < y : ty > y) && (
+        ((tx == x) && (abs(ty-y) <= (y==6 || (y==1) ? 2 : 1)) && !piece(e)) ||
+        ((1==abs(tx-x)) && (1==abs(ty-y)) && piece(e))
+        ));
+        case rook:{
+            if (x==tx){
+                int d = y < ty ? 1 : -1;
+                for (int i = y + d; i != ty; i += d)
+                    if (piece(getCell(b, x,i))) return FALSE;
+            } else if (y==ty){
+                int d = x < tx ? 1 : -1;
+                for (int i = x + d; i != tx; i += d)
+                    if (piece(getCell(b, i,y))) return FALSE;
+            } else return FALSE;
+            return TRUE;
+        }
+        case knight: return (((abs(tx-x)==2)&&(abs(ty-y)==1))||((abs(ty-y)==2)&&(abs(tx-x)==1)));
+        case bishop:{
+            if (abs(tx-x) != abs(ty-y)) return FALSE;
+            for (int i = 1; i != abs(tx-x); i++)
+                if (piece(getCell(b, x+(x < tx ? i : -i),y+(y < ty ? i : -i)))) return FALSE;
+            return TRUE;
+        }
+        case queen:{
+            if (x==tx){
+                int d = y < ty ? 1 : -1;
+                for (int i = y + d; i != ty; i += d)
+                    if (piece(getCell(b, x,i))) return FALSE;
+            } else if (y==ty){
+                int d = x < tx ? 1 : -1;
+                for (int i = x + d; i != tx; i += d)
+                    if (piece(getCell(b, i,y))) return FALSE;
+            } else if (abs(tx-x)==abs(ty-y)){
+                for (int i = 1; i != abs(tx-x); i++)
+                    if (piece(getCell(b, x+(x < tx ? i : -i),y+(y < ty ? i : -i)))) return FALSE;
+            } else return FALSE;
+            return TRUE;
+        }
+        case king: return (1 == abs(tx-x))&&(1 == abs(ty-y)) || (!piece(e) && (
+            (!getFlag(b, loRookMoved0+side(s)) && (tx==2) && !piece(getCell(b, 1,y)) && !piece(getCell(b, 3,y))) ||
+            (!getFlag(b, hiRookMoved0+side(s)) && (tx==6) && !piece(getCell(b, 5,y)))));
+    }
+}
 typedef struct Move {
     i8 x,y,tx,ty;
 }Move;
-Move move;
-bool turn;
-int won = -1; // -1:none, 0:0 won, 1:1 won
 void doMove(Board *b, Move m){
-    b->arr[BAT(m.tx,m.ty)] = b->arr[BAT(m.x,m.y)];
-    b->arr[BAT(m.x,m.y)].piece = NULL;
-}
-void setCell(int x, int y, u16 *piece, bool side){
-    board.arr[y*8 + x].piece = piece;
-    board.arr[y*8 + x].side = side;
-}
-void setRow(int y, bool side){
-    setCell(0,y, rook, side);
-    setCell(1,y, knight, side);
-    setCell(2,y, bishop, side);
-    setCell(3,y, queen, side);
-    setCell(4,y, king, side);
-    setCell(5,y, bishop, side);
-    setCell(6,y, knight, side);
-    setCell(7,y, rook, side);
-}
-void setBoard(){
-    setRow(0, 0);
-    setRow(7, 1);
-    for (int x = 0; x < 8; x++){
-        setCell(x, 1, pawn, 0);
-        setCell(x, 6, pawn, 1);
+    u8 s = getCell(b, m.x,m.y), e = getCell(b, m.tx,m.ty);
+    if (piece(e) == rook){
+        if (m.tx == 0) setFlag(b, loRookMoved0<<side(e), TRUE);
+        else setFlag(b, hiRookMoved0<<side(e), TRUE);
     }
-    board.kingMoved[0] = FALSE;
-    board.kingMoved[1] = FALSE;
+    setCell(b, m.tx,m.ty, s);
+    if (piece(s) == rook){
+        if (m.x == 0) setFlag(b, loRookMoved0<<side(s), TRUE);
+        else setFlag(b, hiRookMoved0<<side(s), TRUE);
+    } else if (piece(s) == king){
+        setFlag(b, loRookMoved0<<side(s), TRUE);
+        setFlag(b, hiRookMoved0<<side(s), TRUE);
+    }
+    setCell(b, m.x,m.y, 0);
+    setFlag(b, turn, !getFlag(b, turn));
 }
+void findKing(Board *b, Side s, int *x, int *y){
+    for (*x = 0; *x < 8; *x++){
+        for (*y = 0; *y < 8; *y++){
+            u8 c = getCell(b, *x,*y);
+            if (side(c) == s && (piece(c) == king)) return;
+        }
+    }
+}
+bool moveLegalChecked(Board *b, Move m){//TODO: This function doesn't check for king moving through check to castle
+    if (moveLegal(b->arr, m.x,m.y,m.tx,m.ty)){
+        Side s = side(getCell(b, m.x,m.y));
+        Board b2 = *b;
+        doMove(&b2, m);
+        int kx,ky;
+        findKing(&b2, s, &kx,&ky);
+        for (int i = 0; i < 8; i++){
+            for (int j = 0; j < 8; j++){
+                u8 c = getCell(&b2, i,j);
+                if (s != side(c) && piece(c) && moveLegal(&b2, i,j,kx,ky)) return FALSE;
+            }
+        }
+        return TRUE;
+    }
+    return FALSE;
+}
+bool checkWin(Board *b, Side s){
+    for (int x = 0; x < 8; x++)
+        for (int y = 0; y < 8; y++){
+            u8 c = getCell(b, x,y);
+            if (s != side(c) && piece(c))
+                for (int tx = 0; tx < 8; tx++)
+                    for (int ty = 0; ty < 8; ty++)
+                        if (moveLegalChecked(b, (Move){x,y,tx,ty})) return FALSE;
+        }
+    return TRUE;
+}
+typedef struct MoveScored {
+    int s;
+    Move m;
+}MoveScored;
+int bestScore(Board b, int width, int depth){
+    MoveScored top[5];
+    for (int i = 0; i < width; i++) top[i].s = -1;
+    for (int y = 0; y < 8; y++)
+        for (int x = 0; x < 8; x++){
+            u8 c = getCell(&b, x,y);
+            if (getFlag(&b, turn)==side(c) && piece(c))
+                for (int ty = 0; ty < 8; ty++)
+                    for (int tx = 0; tx < 8; tx++){
+                        int s = -1;
+                        Move m = {x,y,tx,ty};
+                        if (moveLegalChecked(&b, m)){
+                            u8 start = getCell(&b, m.x,m.y), end = getCell(&b, m.tx,m.ty);
+                            if (side(start)) s += MAX(0, m.y-m.ty);
+                            else s += MAX(0, m.ty-m.y);
+                            switch (piece(end)){
+                                case pawn: s += 2; break;
+                                case rook:case knight:case bishop: s += 6; break;
+                                case queen: s += 10; break;
+                                case king: s += 9999;
+                            }
+                            for (int i = 0; i < width; i++){
+                                if (top[i].s < s){
+                                    top[i].s = s;
+                                    top[i].m = m;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+        }
+    if (top[0].s == -1) return 0;
+    int score = 0;
+    for (int i = 0; i < width; i++){
+        Board nb = b;
+        doMove(&nb, top[i].m);
+        top[i].s = top[i].s - bestScore(nb, width, --depth);
+        if (score < top[i].s) score = top[i].s;
+    }
+    return score;
+}
+Move bestMove(Board b){
+    int score = INT_MAX;
+    Move best;
+    for (int y = 0; y < 8; y++)
+        for (int x = 0; x < 8; x++){
+            u8 c = getCell(&b, x,y);
+            if (getFlag(&b, turn)==side(c) && piece(c))
+                for (int ty = 0; ty < 8; ty++)
+                    for (int tx = 0; tx < 8; tx++){
+                        Move m = {x,y,tx,ty};
+                        if (moveLegalChecked(&b, m)){
+                            Board nb = b;
+                            doMove(&nb, m);
+                            int s = bestScore(nb, 3, 10);
+                            if (s < score){
+                                score = s;
+                                best = m;
+                            }
+                        }
+                    }
+        }
+    return best;
+}
+Board board;
+bool gSide;
+Move move;
+enum Game{
+    gameNone,
+    gameCPU,
+    gameHuman
+}game = gameNone;
+int won = -1; // -1:none, 0:0 won, 1:1 won
 void drawSquare(int x, int y, u32 color){
      for (int j = 0; j < CELL_WIDTH; j++)
         for (int i = 0; i < CELL_WIDTH; i++)
@@ -169,91 +344,6 @@ void drawPiece(u16 *piece, u32 color, int x, int y){
 }
 void drawPieceOnCell(u16 *piece, u32 color, int x, int y){
     drawPiece(piece, color, x*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, y*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
-}
-bool moveLegal(Cell *b, int x, int y, int tx, int ty){
-    Cell *start = b + BAT(x,y);
-    Cell *target = b + BAT(tx,ty);
-    if ((start == target) || (!start->piece) || (target->piece && (target->side == start->side))) return FALSE;
-    if (start->piece == pawn) return ((start->side ? ty < y : ty > y) && (
-        ((tx == x) && (abs(ty-y) <= (y==6 || (y==1) ? 2 : 1)) && (!target->piece)) ||
-        ((1==abs(tx-x)) && (1==abs(ty-y)) && (target->piece))
-        )
-    );
-    else if (start->piece == rook){
-        if (x==tx){
-            int d = y < ty ? 1 : -1;
-            for (int i = y + d; i != ty; i += d)
-                if (b[BAT(x,i)].piece) return FALSE;
-        } else if (y==ty){
-            int d = x < tx ? 1 : -1;
-            for (int i = x + d; i != tx; i += d)
-                if (b[BAT(i,y)].piece) return FALSE;
-        } else return FALSE;
-    }
-    else if (start->piece == knight) return (((abs(tx-x)==2)&&(abs(ty-y)==1))||((abs(ty-y)==2)&&(abs(tx-x)==1)));
-    else if (start->piece == bishop){
-        if (abs(tx-x) != abs(ty-y)) return FALSE;
-        for (int i = 1; i != abs(tx-x); i++)
-            if (b[BAT(x+(x < tx ? i : -i),y+(y < ty ? i : -i))].piece) return FALSE;
-    }
-    else if (start->piece == queen){
-        if (x==tx){
-            int d = y < ty ? 1 : -1;
-            for (int i = y + d; i != ty; i += d)
-                if (b[BAT(x,i)].piece) return FALSE;
-        } else if (y==ty){
-            int d = x < tx ? 1 : -1;
-            for (int i = x + d; i != tx; i += d)
-                if (b[BAT(i,y)].piece) return FALSE;
-        } else if (abs(tx-x)==abs(ty-y)){
-            for (int i = 1; i != abs(tx-x); i++)
-                if (b[BAT(x+(x < tx ? i : -i),y+(y < ty ? i : -i))].piece) return FALSE;
-        } else return FALSE;
-    }
-    else if ((1 < abs(tx-x))||(1 < abs(ty-y))) return FALSE;
-    return TRUE;
-}
-void findKing(Board *b, bool s, int *x, int *y){
-    for (int i = 0; i < 8; i++){
-        for (int j = 0; j < 8; j++){
-            Cell *c = b->arr + BAT(i,j);
-            if (c->piece && (c->piece == king) && (c->side == s)){
-                *x = i;
-                *y = j;
-                return;
-            }
-        }
-    }
-}
-Board board2;
-bool moveLegalChecked(Move m){
-    if (moveLegal(board.arr, m.x,m.y,m.tx,m.ty)){
-        bool side = board.arr[BAT(m.x, m.y)].side;
-        board2 = board;
-        doMove(&board2, m);
-        int kx,ky;
-        findKing(&board2, side, &kx,&ky);
-        for (int i = 0; i < 8; i++){
-            for (int j = 0; j < 8; j++){
-                Cell *c = board2.arr + BAT(i,j);
-                if (c->piece && (c->side != side) && moveLegal(board2.arr, i,j,kx,ky)) return FALSE;
-            }
-        }
-        return TRUE;
-    }
-    return FALSE;
-}
-bool checkWin(bool side){
-    for (int x = 0; x < 8; x++)
-        for (int y = 0; y < 8; y++){
-            Cell *c = board.arr + BAT(x,y);
-            if (c->piece && (c->side == !side))
-                for (int tx = 0; tx < 8; tx++)
-                    for (int ty = 0; ty < 8; ty++)
-                        if (moveLegalChecked((Move){x,y,tx,ty})) return FALSE;
-        }
-    won = side;
-    return TRUE;
 }
 void fillRect(int x, int y, int width, int height, u32 color){
     for (int j = 0; j < height; j++){
@@ -302,7 +392,11 @@ void incCpuLvl(){
         sprintf(cpuLvlStr, "%d", cpuLvl);
     }
 }
-bool connected;
+void playCPU(){
+    setBoard();
+    game = gameCPU;
+    gSide = rand() % 2;
+}
 void decTheme();
 void incTheme();
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
@@ -316,7 +410,7 @@ Button buttons[]={
     CHARPOS(0,3),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT, cpuLvlStr,NULL,
     2+CHARPOS(2,3),GLYPH_WIDTH,GLYPH_HEIGHT,"<",decCpuLvl,
     2+CHARPOS(13,3),GLYPH_WIDTH,GLYPH_HEIGHT,">",incCpuLvl,
-    CHARPOS(0,5),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Play CPU",NULL,
+    CHARPOS(0,5),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Play CPU",playCPU,
     CHARPOS(0,7),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Play Human",playHuman,
     CHARPOS(0,10),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Theme:",NULL,
     CHARPOS(0,11),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,NULL,NULL,
@@ -394,7 +488,7 @@ void closeGame(){
 #elif __APPLE__
     close(sock);
 #endif
-    connected = FALSE;
+    game = gameNone;
 }
 void stepGame(){
     send(sock, &move, sizeof(move), 0);
@@ -408,8 +502,8 @@ void stepGame(){
     turn = TRUE;
 }
 void playHuman(){
-    if (!connected){
-        connected = TRUE;
+    if (game == gameNone){
+        game = gameHuman;
 #if _WIN32
         CreateThread(NULL, 0, findGame, NULL, 0, NULL);
 #elif __APPLE__
@@ -448,13 +542,16 @@ void mouseLeftDown(int x, int y){
             int x = (selectedCell-board.arr) % 8,
                 y = (selectedCell-board.arr) / 8;
             Move m = {x,y,cx,cy};
-            if ((!connected && moveLegal(board.arr, m.x,m.y,m.tx,m.ty)) ||
-            (connected && (won < 0) && turn && moveLegalChecked(m))){
+            if ((game==gameNone && moveLegal(board.arr, m.x,m.y,m.tx,m.ty)) ||
+            ((won < 0) && turn && moveLegalChecked(m))){
                 doMove(&board, m);
                 move = m;
                 selectedCell = NULL;
                 turn = FALSE;
-                if (connected){
+                if (game==gameCPU){
+                    doMove(&board, getCPUMove());
+                    turn = TRUE;
+                } else if (game==gameHuman){
                     #if _WIN32
                     CreateThread(NULL, 0, stepGame, NULL, 0, NULL);
                     #elif __APPLE__
@@ -464,7 +561,7 @@ void mouseLeftDown(int x, int y){
                 }
             }
         }
-        else if (c->piece && (!connected || (gSide == c->side))) selectedCell = c;
+        else if (c->piece && (game==gameNone || (gSide == c->side))) selectedCell = c;
         sprintf(mousePos, "%d,%d", cx, cy);
     }
     if (hoveredButton) hoveredButton->func();
