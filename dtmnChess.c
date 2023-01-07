@@ -40,7 +40,7 @@ u8 getCell(Board *b, int x, int y){
 void setCell(Board *b, int x, int y, u8 c){
     b->arr[y] = (b->arr[y] & ~(0xf << x*4)) | (c << (x*4));
 }
-bool side(u8 c){
+Side side(u8 c){
     return c >> 3;
 }
 u8 piece(u8 c){
@@ -143,20 +143,28 @@ void findKing(Board *b, Side s, int *x, int *y){
         }
     }
 }
-bool moveLegalChecked(Board *b, Move m){//TODO: This function doesn't check for king moving through check to castle
-    if (moveLegal(b->arr, m.x,m.y,m.tx,m.ty)){
-        Side s = side(getCell(b, m.x,m.y));
-        Board b2 = *b;
-        doMove(&b2, m);
-        int kx,ky;
-        findKing(&b2, s, &kx,&ky);
-        for (int i = 0; i < 8; i++){
-            for (int j = 0; j < 8; j++){
-                u8 c = getCell(&b2, i,j);
-                if (s != side(c) && piece(c) && moveLegal(&b2, i,j,kx,ky)) return FALSE;
-            }
+bool moveIntoCheck(Board *b, Move m){
+    Side s = side(getCell(b, m.x,m.y));
+    Board b2 = *b;
+    doMove(&b2, m);
+    int kx,ky;
+    findKing(&b2, s, &kx,&ky);
+    for (int i = 0; i < 8; i++){
+        for (int j = 0; j < 8; j++){
+            u8 c = getCell(&b2, i,j);
+            if (s != side(c) && piece(c) && moveLegal(&b2, i,j,kx,ky)) return TRUE;
         }
-        return TRUE;
+    }
+    return FALSE;
+}
+bool moveLegalChecked(Board *b, Move m){
+    if (moveLegal(b->arr, m.x,m.y,m.tx,m.ty)){
+        u8 s = getCell(b, m.x,m.y);
+        if (piece(s)==king && (abs(m.tx-m.x) > 1)){
+            if (m.tx == 2 && moveIntoCheck(b, (Move){m.x,m.y,3,m.ty})) return FALSE;
+            if (m.tx == 6 && moveIntoCheck(b, (Move){m.x,m.y,5,m.ty})) return FALSE;
+        }
+        return !moveIntoCheck(b, m);
     }
     return FALSE;
 }
