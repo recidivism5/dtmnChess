@@ -138,8 +138,8 @@ void doMove(Board *b, Move m){
     setFlag(b, turn, !getFlag(b, turn));
 }
 void findKing(Board *b, Side s, int *x, int *y){
-    for (*x = 0; *x < 8; *x++){
-        for (*y = 0; *y < 8; *y++){
+    for (*x = 0; *x < 8; (*x)++){
+        for (*y = 0; *y < 8; (*y)++){
             u8 c = getCell(b, *x,*y);
             if (side(c) == s && (piece(c) == king)) return;
         }
@@ -160,7 +160,7 @@ bool moveIntoCheck(Board *b, Move m){
     return FALSE;
 }
 bool moveLegalChecked(Board *b, Move m){
-    if (moveLegal(b->arr, m.x,m.y,m.tx,m.ty)){
+    if (moveLegal(b, m.x,m.y,m.tx,m.ty)){
         u8 s = getCell(b, m.x,m.y);
         if (piece(s)==king && (abs(m.tx-m.x) > 1)){
             if (m.tx == 2 && moveIntoCheck(b, (Move){m.x,m.y,3,m.ty})) return FALSE;
@@ -398,6 +398,7 @@ void playCPU(){
     setBoard(&game.b);
     game.t = gameCPU;
     game.s = rand() % 2;
+    if (game.s) doMove(&game.b, bestMove(&game.b));
 }
 void decTheme();
 void incTheme();
@@ -436,16 +437,16 @@ void draw(){
     for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = theme->rightPanel;
     for (int y = 0; y < 8; y++){
         for (int x = 0; x < 8; x++){
-            int scrY = gSide ? y : 7-y,
-                scrX = gSide ? 7-x : x;
+            int scrY = game.s ? y : 7-y,
+                scrX = game.s ? 7-x : x;
             fillRect(scrX*CELL_WIDTH,scrY*CELL_WIDTH, CELL_WIDTH,CELL_WIDTH, theme->board[(scrX%2)^(scrY%2)]);
-            u8 c = getCell(&board, x,y);
+            u8 c = getCell(&game.b, x,y);
             if (piece(c)) drawPiece(pieceImgs[piece(c)-1], theme->piece[side(c)], scrX*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, scrY*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
         }
     }
     drawString(0,0, mousePos);
-    if (won == gSide) drawString(50,50, "You won");
-    else if (won == !gSide) drawString(50,50, "You lost");
+    //if (won == gSide) drawString(50,50, "You won");
+    //else if (won == !gSide) drawString(50,50, "You lost");
     for (int i = 0; i < COUNT(buttons); i++) drawButton(buttons+i);
 #if _WIN32
     StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
@@ -474,11 +475,11 @@ void findGame(){
     if(0 > connect(sock, &sa, sizeof(sa))) perror("connect failed: ");
 #endif
     send(sock, minutes, sizeof(*minutes), 0);
-    recv(sock, &gSide, sizeof(gSide), 0);
+    recv(sock, &game.s, sizeof(game.s), 0);
     draw();
-    if (gSide){
-        recv(sock, &move, sizeof(move), 0); //get first move if black
-        doMove(&board, move);
+    if (game.s){
+        recv(sock, &game.m, sizeof(game.m), 0); //get first move if black
+        doMove(&game.b, game.m);
         draw();
     }
 }
@@ -489,21 +490,21 @@ void closeGame(){
 #elif __APPLE__
     close(sock);
 #endif
-    game = gameNone;
+    game.t = gameNone;
 }
 void stepGame(){
-    send(sock, &move, sizeof(move), 0);
-    if (checkWin(&board, gSide)) closeGame();
+    send(sock, &game.m, sizeof(game.m), 0);
+    if (checkWin(&game.b, game.s)) closeGame();
     else {
-        recv(sock, &move, sizeof(move), 0);
-        doMove(&board, move);
-        if (checkWin(&board, !gSide)) closeGame();
+        recv(sock, &game.m, sizeof(game.m), 0);
+        doMove(&game.b, game.m);
+        if (checkWin(&game.b, !game.s)) closeGame();
     }
     draw();
 }
 void playHuman(){
-    if (game == gameNone){
-        game = gameHuman;
+    if (game.t == gameNone){
+        game.t = gameHuman;
 #if _WIN32
         CreateThread(NULL, 0, findGame, NULL, 0, NULL);
 #elif __APPLE__
@@ -532,20 +533,32 @@ void mouseMove(int x, int y){
         draw();
     }
 }
-Move userMove = {-1};
+Move uMove;
 void mouseLeftDown(int x, int y){
-    int cx = gSide ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
-        cy = gSide ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
-    if (cx < 8){
-        u8 c = getCell(&board, cx,cy);
-        /*
-        Cell *c = board.arr + BAT(cx,cy);
-        if (selectedCell){
-            int x = (selectedCell-board.arr) % 8,
-                y = (selectedCell-board.arr) / 8;
-            Move m = {x,y,cx,cy};
-            if ((game==gameNone && moveLegal(board.arr, m.x,m.y,m.tx,m.ty)) ||
-            ((won < 0) && turn && moveLegalChecked(m))){
+    uMove.tx = game.s ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
+    uMove.ty = game.s ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
+    if (uMove.tx < 8){
+        u8 c = getCell(&game.b, uMove.tx,uMove.ty);
+        if (game.s == side(c) && piece(c)){
+            uMove.x = uMove.tx;
+            uMove.y = uMove.ty;
+        } else {
+            if (uMove.x >= 0){
+                if (game.t==gameNone && moveLegalChecked(&game.b, uMove)){
+                    doMove(&game.b, uMove);
+                    game.s = !game.s;
+                } else if (game.t==gameCPU && moveLegalChecked(&game.b, uMove)){
+                    doMove(&game.b, uMove);
+                    doMove(&game.b, bestMove(&game.b));
+                }
+            }
+            uMove.x = -1;
+        }
+        /*if (userMove.x >= 0){
+            userMove.tx = cx;
+            userMove.ty = cy;
+            if ((game.t==gameNone && moveLegalChecked(&game.b, userMove)) ||
+            ( && turn && moveLegalChecked(m))){
                 doMove(&board, m);
                 move = m;
                 selectedCell = NULL;
@@ -574,7 +587,7 @@ void mouseRightDown(int x, int y){
 void charInput(char c){
 }
 void init(){
-    setBoard(&board);
+    setBoard(&game.b);
     buttons[11].str = theme->name;
 }
 #if _WIN32
