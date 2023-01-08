@@ -31,7 +31,8 @@ bool getFlag(Board *b, Flag f){
     return !!(b->flags & f);
 }
 void setFlag(Board *b, Flag f, bool v){
-    b->flags = (b->flags & ~f) | v ? f : 0;
+    if (v) b->flags |= f;
+    else b->flags &= ~f;
 }
 u8 cell(Side s, Piece p){
     return s<<3 | p;
@@ -563,30 +564,6 @@ void mouseLeftDown(int x, int y){
             }
             uMove.x = -1;
         }
-        /*if (userMove.x >= 0){
-            userMove.tx = cx;
-            userMove.ty = cy;
-            if ((game.t==gameNone && moveLegalChecked(&game.b, userMove)) ||
-            ( && turn && moveLegalChecked(m))){
-                doMove(&board, m);
-                move = m;
-                selectedCell = NULL;
-                turn = FALSE;
-                if (game==gameCPU){
-                    doMove(&board, getCPUMove());
-                    turn = TRUE;
-                } else if (game==gameHuman){
-                    #if _WIN32
-                    CreateThread(NULL, 0, stepGame, NULL, 0, NULL);
-                    #elif __APPLE__
-                    pthread_t pt;
-                    pthread_create(&pt, NULL, stepGame, NULL);
-                    #endif
-                }
-            }
-        }
-        else if (c->piece && (game==gameNone || (gSide == c->side))) selectedCell = c;
-        sprintf(mousePos, "%d,%d", cx, cy);*/
     }
     if (hoveredButton) hoveredButton->func();
     draw();
