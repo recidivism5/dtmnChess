@@ -112,9 +112,9 @@ bool moveLegal(Board *b, int x, int y, int tx, int ty){
             } else return FALSE;
             return TRUE;
         }
-        case king: return (1 == abs(tx-x))&&(1 == abs(ty-y)) || (!piece(e) && (
-            (!getFlag(b, loRookMoved0+side(s)) && (tx==2) && !piece(getCell(b, 1,y)) && !piece(getCell(b, 3,y))) ||
-            (!getFlag(b, hiRookMoved0+side(s)) && (tx==6) && !piece(getCell(b, 5,y)))));
+        case king: return (1 == abs(tx-x))&&(1 == abs(ty-y)) || (!piece(e) && (ty==y) && (abs(tx-x)==2) && (
+            (!getFlag(b, loRookMoved0<<side(s)) && (tx==2) && !piece(getCell(b, 1,y)) && !piece(getCell(b, 3,y))) ||
+            (!getFlag(b, hiRookMoved0<<side(s)) && (tx==6) && !piece(getCell(b, 5,y)))));
     }
 }
 typedef struct Move {
@@ -131,6 +131,15 @@ void doMove(Board *b, Move m){
         if (m.x == 0) setFlag(b, loRookMoved0<<side(s), TRUE);
         else setFlag(b, hiRookMoved0<<side(s), TRUE);
     } else if (piece(s) == king){
+        if (abs(m.tx-m.x)==2){
+            if (m.tx == 2){
+                setCell(b, 3,m.ty, getCell(b, 0,m.ty));
+                setCell(b, 0,m.ty, 0);
+            } else {
+                setCell(b, 5,m.ty, getCell(b, 7,m.ty));
+                setCell(b, 7,m.ty, 0);
+            }
+        }
         setFlag(b, loRookMoved0<<side(s), TRUE);
         setFlag(b, hiRookMoved0<<side(s), TRUE);
     }
