@@ -219,9 +219,11 @@ int bestScore(Board b, int width, int depth){
     if (top[0].s == -1) return 0;
     int score = 0;
     for (int i = 0; i < width; i++){
-        Board nb = b;
-        doMove(&nb, top[i].m);
-        top[i].s = top[i].s - bestScore(nb, width, --depth);
+        if (depth){
+            Board nb = b;
+            doMove(&nb, top[i].m);
+            top[i].s -= bestScore(nb, width, depth-1);
+        }
         if (score < top[i].s) score = top[i].s;
     }
     return score;
@@ -239,7 +241,7 @@ Move bestMove(Board *b){
                         if (moveLegalChecked(b, m)){
                             Board nb = *b;
                             doMove(&nb, m);
-                            int s = bestScore(nb, 3, 10);
+                            int s = bestScore(nb, 3, 4);
                             if (s < score){
                                 score = s;
                                 best = m;
@@ -345,15 +347,13 @@ void drawPiece(u16 *img, u32 color, int x, int y){
                 frameBuffer[(y+j+1)*WIDTH + x+i+1] = SHADOW;
             }
 }
-Board board;
-bool gSide;
-Move move;
-enum Game{
-    gameNone,
-    gameCPU,
-    gameHuman
-}game = gameNone;
-int won = -1; // -1:none, 0:0 won, 1:1 won
+typedef enum GameType{gameNone,gameCPU,gameHuman}GameType;
+struct Game {
+    GameType t;
+    Board b;
+    Side s;
+    Move m;
+}game;
 typedef struct Button {
     int x,y,width,height;
     char *str;
@@ -395,9 +395,9 @@ void incCpuLvl(){
     }
 }
 void playCPU(){
-    setBoard(&board);
-    game = gameCPU;
-    gSide = rand() % 2;
+    setBoard(&game.b);
+    game.t = gameCPU;
+    game.s = rand() % 2;
 }
 void decTheme();
 void incTheme();
