@@ -119,7 +119,7 @@ bool moveLegal(Board *b, int x, int y, int tx, int ty){
             } else return FALSE;
             return TRUE;
         }
-        case king: return (1 == abs(tx-x))&&(1 == abs(ty-y)) || (!piece(e) && (ty==y) && (abs(tx-x)==2) && (
+        case king: return (abs(tx-x)<=1)&&(abs(ty-y)<=1) || (!piece(e) && (ty==y) && (abs(tx-x)==2) && (
             (!getFlag(b, loRookMoved0<<side(s)) && (tx==2) && !pieceAt(b, 1,y) && !pieceAt(b, 3,y)) ||
             (!getFlag(b, hiRookMoved0<<side(s)) && (tx==6) && !pieceAt(b, 5,y))));
     }
@@ -176,7 +176,9 @@ bool moveIntoCheck(Board *b, Move m){
     return FALSE;
 }
 bool moveLegalChecked(Board *b, Move m){
+    printf("checking %d %d to %d %d\n",m.x,m.y,m.tx,m.ty);
     if (moveLegal(b, m.x,m.y,m.tx,m.ty)){
+        printf("passed moveLegal\n");
         u8 s = getCell(b, m.x,m.y);
         if (piece(s)==king && (abs(m.tx-m.x) > 1)){
             if (m.tx == 2 && moveIntoCheck(b, (Move){m.x,m.y,3,m.ty})) return FALSE;
@@ -217,9 +219,9 @@ int bestScore(Board b, int width, int depth){
                             if (side(start)) s += MAX(0, m.y-m.ty);
                             else s += MAX(0, m.ty-m.y);
                             switch (piece(end)){
-                                case pawn: s += 2; break;
-                                case rook:case knight:case bishop: s += 6; break;
-                                case queen: s += 10; break;
+                                case pawn: s += 4; break;
+                                case rook:case knight:case bishop: s += 10; break;
+                                case queen: s += 20; break;
                                 case king: s += 9999;
                             }
                             for (int i = 0; i < width; i++){
