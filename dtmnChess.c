@@ -49,6 +49,12 @@ Side side(u8 c){
 u8 piece(u8 c){
     return c & 0b111;
 }
+Side sideAt(Board *b, int x, int y){
+    return side(getCell(b,x,y));
+}
+u8 pieceAt(Board *b, int x, int y){
+    return piece(getCell(b,x,y));
+}
 void setRow(Board *b, int y, Side s){
     setCell(b,0,y,cell(s,rook));
     setCell(b,1,y,cell(s,knight));
@@ -76,18 +82,18 @@ bool moveLegal(Board *b, int x, int y, int tx, int ty){
     if (((x==tx)&&(y==ty)) || (!piece(s)) || (side(s) != getFlag(b,turn)) || (piece(e) && (side(e) == side(s)))) return FALSE;
     switch (piece(s)){
         case pawn: return ((side(s) ? ty < y : ty > y) && (
-        ((tx == x) && (abs(ty-y) <= (y==6 || (y==1) ? 2 : 1)) && !piece(e)) ||
+        ((tx == x) && (abs(ty-y) <= (y==6 || (y==1) ? 2 : 1)) && !pieceAt(b,tx,y==1 ? 2 : 5) && !piece(e)) ||
         ((1==abs(tx-x)) && (1==abs(ty-y)) && piece(e))
         ));
         case rook:{
             if (x==tx){
                 int d = y < ty ? 1 : -1;
                 for (int i = y + d; i != ty; i += d)
-                    if (piece(getCell(b, x,i))) return FALSE;
+                    if (pieceAt(b, x,i)) return FALSE;
             } else if (y==ty){
                 int d = x < tx ? 1 : -1;
                 for (int i = x + d; i != tx; i += d)
-                    if (piece(getCell(b, i,y))) return FALSE;
+                    if (pieceAt(b, i,y)) return FALSE;
             } else return FALSE;
             return TRUE;
         }
@@ -95,27 +101,27 @@ bool moveLegal(Board *b, int x, int y, int tx, int ty){
         case bishop:{
             if (abs(tx-x) != abs(ty-y)) return FALSE;
             for (int i = 1; i != abs(tx-x); i++)
-                if (piece(getCell(b, x+(x < tx ? i : -i),y+(y < ty ? i : -i)))) return FALSE;
+                if (pieceAt(b, x+(x < tx ? i : -i),y+(y < ty ? i : -i))) return FALSE;
             return TRUE;
         }
         case queen:{
             if (x==tx){
                 int d = y < ty ? 1 : -1;
                 for (int i = y + d; i != ty; i += d)
-                    if (piece(getCell(b, x,i))) return FALSE;
+                    if (pieceAt(b, x,i)) return FALSE;
             } else if (y==ty){
                 int d = x < tx ? 1 : -1;
                 for (int i = x + d; i != tx; i += d)
-                    if (piece(getCell(b, i,y))) return FALSE;
+                    if (pieceAt(b, i,y)) return FALSE;
             } else if (abs(tx-x)==abs(ty-y)){
                 for (int i = 1; i != abs(tx-x); i++)
-                    if (piece(getCell(b, x+(x < tx ? i : -i),y+(y < ty ? i : -i)))) return FALSE;
+                    if (pieceAt(b, x+(x < tx ? i : -i),y+(y < ty ? i : -i))) return FALSE;
             } else return FALSE;
             return TRUE;
         }
         case king: return (1 == abs(tx-x))&&(1 == abs(ty-y)) || (!piece(e) && (ty==y) && (abs(tx-x)==2) && (
-            (!getFlag(b, loRookMoved0<<side(s)) && (tx==2) && !piece(getCell(b, 1,y)) && !piece(getCell(b, 3,y))) ||
-            (!getFlag(b, hiRookMoved0<<side(s)) && (tx==6) && !piece(getCell(b, 5,y)))));
+            (!getFlag(b, loRookMoved0<<side(s)) && (tx==2) && !pieceAt(b, 1,y) && !pieceAt(b, 3,y)) ||
+            (!getFlag(b, hiRookMoved0<<side(s)) && (tx==6) && !pieceAt(b, 5,y))));
     }
 }
 typedef struct Move {
@@ -156,7 +162,7 @@ void findKing(Board *b, Side s, int *x, int *y){
     }
 }
 bool moveIntoCheck(Board *b, Move m){
-    Side s = side(getCell(b, m.x,m.y));
+    Side s = sideAt(b, m.x,m.y);
     Board b2 = *b;
     doMove(&b2, m);
     int kx,ky;
