@@ -413,29 +413,29 @@ void backToMenu();
 void decTheme();
 void incTheme();
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
-#define LABEL(y, str, func) CHARPOS(0,y),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,str,func
-#define SELECTOR(y, label, str, dec, inc) LABEL(y,label,NULL),\
-                                          LABEL(y+1,str,NULL),\
+#define LABEL(y, str, func) CHARPOS(0,y),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,str,func,
+#define SELECTOR(y, label, str, dec, inc) LABEL(y,label,NULL)\
+                                          LABEL(y+1,str,NULL)\
                                           2+CHARPOS(2,y+1),GLYPH_WIDTH,GLYPH_HEIGHT,"<",dec,\
-                                          2+CHARPOS(13,y+1),GLYPH_WIDTH,GLYPH_HEIGHT,">",inc
+                                          2+CHARPOS(13,y+1),GLYPH_WIDTH,GLYPH_HEIGHT,">",inc,
 Button buttonsMain[]={
-    LABEL(4,"Play CPU",playCPU),
-    LABEL(6,"New Room",newRoom),
-    LABEL(8,"Join Room",joinRoom),
+    LABEL(4,"Play CPU",playCPU)
+    LABEL(6,"New Room",newRoom)
+    LABEL(8,"Join Room",joinRoom)
     SELECTOR(10,"Theme:",NULL,decTheme,incTheme)
 };
 Button buttonsCPU[]={
-    SELECTOR(3,"Minutes:",minutesStr,decMinutes,incMinutes),
-    SELECTOR(6,"CPU Lvl:",cpuLvlStr,decCpuLvl,incCpuLvl),
-    LABEL(9,"Play",playCPU),
+    SELECTOR(3,"Minutes:",minutesStr,decMinutes,incMinutes)
+    SELECTOR(6,"CPU Lvl:",cpuLvlStr,decCpuLvl,incCpuLvl)
+    LABEL(9,"Play",playCPU)
     LABEL(11,"Back to menu",backToMenu)
 };
 roomCode[9];
 Button buttonsRoom[]={
-    LABEL(3,"Room Code:",NULL),
-    LABEL(4,roomCode,NULL),
-    SELECTOR(6,"Minutes:",minutesStr,decMinutes,incMinutes),
-    LABEL(9,"Play",playHuman),
+    LABEL(3,"Room Code:",NULL)
+    LABEL(4,roomCode,NULL)
+    SELECTOR(6,"Minutes:",minutesStr,decMinutes,incMinutes)
+    LABEL(9,"Play",playHuman)
     LABEL(11,"Back to menu",backToMenu)
 };
 typedef struct Menu {
