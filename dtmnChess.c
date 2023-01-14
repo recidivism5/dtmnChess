@@ -347,6 +347,31 @@ void drawButton(Button *b){
     int strpx = strlen(b->str)*6;
     drawString(b->x+b->width/2-strpx/2, b->y+b->height/2-8/2, b->str);
 }
+#if _WIN32
+#undef UNICODE
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment (lib, "Ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
+HWND window;
+#define DRAW() InvalidateRect(window, NULL, FALSE)
+SOCKET sock;
+struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
+#elif __APPLE__
+#include <Cocoa/Cocoa.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <pthread.h>
+#include <errno.h>
+id window;
+#define DRAW() [[window contentView] setNeedsDisplay:YES]
+int sock;
+#endif
 int minutesOptions[]={1, 3, 5, 10};
 int *minutes = minutesOptions;
 char minutesStr[3] = {'1',0,0};
@@ -396,28 +421,6 @@ void backToMenu(){
 }
 void decTheme();
 void incTheme();
-#if _WIN32
-#undef UNICODE
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment (lib, "Ws2_32.lib")
-#pragma comment (lib, "Mswsock.lib")
-#pragma comment (lib, "AdvApi32.lib")
-SOCKET sock;
-struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
-#elif __APPLE__
-#include <Cocoa/Cocoa.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-#include <errno.h>
-id window;
-int sock;
-#endif
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
 #define LABEL(y, str, func) CHARPOS(0,y),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,str,func
 #define SELECTOR(y, label, str, dec, inc) LABEL(y,label,NULL),\
@@ -534,8 +537,6 @@ struct BMI {
     BITMAPINFOHEADER    bmiHeader;
     RGBQUAD             bmiColors[3];
 } bmi;
-HDC hdc;
-#define DRAW() InvalidateRect(hwnd, NULL, FALSE)
 LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
     BOOL t = TRUE;
     switch (msg){
@@ -556,14 +557,16 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         PostQuitMessage(0);
         return 0;
     case WM_PAINT:{
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
 #elif __APPLE__
-#define DRAW() [[window contentView] setNeedsDisplay:YES]
 @interface FBView : NSView<NSTextInputClient>
 @end
 @implementation FBView
 - (void)drawRect:(NSRect)rect {
 #endif
     //draw here
+    printf("paint\n");
     for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = theme->rightPanel;
     for (int y = 0; y < 8; y++){
         for (int x = 0; x < 8; x++){
@@ -578,6 +581,8 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
     for (int i = 0; i < menu->buttonCount; i++) drawButton(menu->buttons+i);
 #if _WIN32
     StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
+    EndPaint(hwnd, &ps);
+    return 0;
 }
 case WM_MOUSEMOVE:{
     int x = GET_X_LPARAM(lparam)/SCALE, y = GET_Y_LPARAM(lparam)/SCALE;
@@ -636,11 +641,13 @@ case WM_MOUSEMOVE:{
         hoveredButton = NULL;
         DRAW();
     }
-}
 #if _WIN32
+    return 0;
+}
 case WM_LBUTTONDOWN:{
     int x = GET_X_LPARAM(lparam)/SCALE, y = GET_Y_LPARAM(lparam)/SCALE;
 #elif __APPLE__
+}
 - (void)mouseDown:(NSEvent *) event {
     NSPoint p = [event locationInWindow];
     int x = p.x/SCALE, y = HEIGHT-(p.y+2)/SCALE;
@@ -668,17 +675,15 @@ case WM_LBUTTONDOWN:{
     }
     if (hoveredButton) hoveredButton->func();
     DRAW();
-}
 #if _WIN32
-    }
-    return DefWindowProcA(hwnd, msg, wparam, lparam);
-}
+    return 0;}
+} return DefWindowProcA(hwnd, msg, wparam, lparam);}
 WNDCLASSA wc = {0,WindowProc,0,0,NULL,NULL,NULL,NULL,NULL,title};
-HWND wnd;
 MSG msg;
 RECT wr;
 int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int nCmdShow){
 #elif __APPLE__
+}
 @end
 @interface FBWindow : NSWindow<NSWindowDelegate>
 @end
@@ -734,9 +739,8 @@ int main(){
     wr.right = WND_WIDTH;
     wr.bottom = WND_HEIGHT;
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW^WS_THICKFRAME, FALSE);
-    wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW^WS_THICKFRAME,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
-    hdc = GetDC(wnd);
-    InvalidateRect(wnd, NULL, FALSE);
+    window = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW^WS_THICKFRAME,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
+    DRAW();
     while (GetMessageA(&msg, NULL, 0, 0)){
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
