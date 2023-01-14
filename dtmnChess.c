@@ -401,12 +401,7 @@ void incCpuLvl(){
         sprintf(cpuLvlStr, "%d", cpuLvl);
     }
 }
-void playCPU(){
-    setBoard(&game.b);
-    game.t = gameCPU;
-    game.s = rand() % 2;
-    if (game.s) doMove(&game.b, bestMove(&game.b));
-}
+void playCPU();
 void newRoom(){
 
 }
@@ -436,13 +431,13 @@ Button buttonsMain[]={
 Button buttonsCPU[]={
     SELECTOR(1,"Minutes:",minutesStr,decMinutes,incMinutes),
     SELECTOR(3,"CPU Lvl:",cpuLvlStr,decCpuLvl,incCpuLvl),
-    LABEL(5,"Play",playCPU),
-    LABEL(8,"Back to menu",backToMenu)
+    LABEL(7,"Play",playCPU),
+    LABEL(9,"Back to menu",backToMenu)
 };
 Button buttonsRoom[]={
     SELECTOR(3,"Minutes:",minutesStr,decMinutes,incMinutes),
-    LABEL(5,"Play",playHuman),
-    LABEL(8,"Back to menu",backToMenu)
+    LABEL(7,"Play",playHuman),
+    LABEL(9,"Back to menu",backToMenu)
 };
 typedef struct Menu {
     Button *buttons;
@@ -454,6 +449,16 @@ Menu menus[]={
     buttonsRoom,COUNT(buttonsRoom)
 };
 Menu *menu = menus;
+void playCPU(){
+    if (menu != (menus+1)){
+        menu = menus+1;
+        return;
+    }
+    setBoard(&game.b);
+    game.t = gameCPU;
+    game.s = rand() % 2;
+    if (game.s) doMove(&game.b, bestMove(&game.b));
+}
 void decTheme(){
     if (theme-themes > 0){
         theme--;
@@ -566,7 +571,6 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
 - (void)drawRect:(NSRect)rect {
 #endif
     //draw here
-    printf("paint\n");
     for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = theme->rightPanel;
     for (int y = 0; y < 8; y++){
         for (int x = 0; x < 8; x++){
@@ -590,29 +594,11 @@ case WM_MOUSEMOVE:{
     CGContextRef context = [[NSGraphicsContext currentContext] CGContext];
     CGContextSetInterpolationQuality(context, 1);
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-    CGDataProviderRef provider = CGDataProviderCreateWithData(0x0,
-        frameBuffer,
-        sizeof(frameBuffer),
-        0x0
-    );
-    CGImageRef img = CGImageCreate(WIDTH
-        , HEIGHT
-        , 8
-        , 32
-        , WIDTH * 4
-        , space
-        , kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little
-        , provider
-        , 0x0
-        , false
-        , kCGRenderingIntentDefault
-    );
+    CGDataProviderRef provider = CGDataProviderCreateWithData(0x0,frameBuffer,sizeof(frameBuffer),0);
+    CGImageRef img = CGImageCreate(WIDTH,HEIGHT,8,32,WIDTH*4,space,kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little,provider,0,false,kCGRenderingIntentDefault);
     CGColorSpaceRelease(space);
     CGDataProviderRelease(provider);
-    CGContextDrawImage(context,
-        CGRectMake(0, 0, WND_WIDTH, WND_HEIGHT),
-        img
-    );
+    CGContextDrawImage(context,CGRectMake(0, 0, WND_WIDTH, WND_HEIGHT),img);
     CGImageRelease(img);
 }
 - (BOOL)acceptsFirstMouse:(NSEvent *)event {
