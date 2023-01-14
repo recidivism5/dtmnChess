@@ -425,15 +425,18 @@ Button buttonsMain[]={
     SELECTOR(10,"Theme:",NULL,decTheme,incTheme)
 };
 Button buttonsCPU[]={
-    SELECTOR(1,"Minutes:",minutesStr,decMinutes,incMinutes),
-    SELECTOR(3,"CPU Lvl:",cpuLvlStr,decCpuLvl,incCpuLvl),
-    LABEL(7,"Play",playCPU),
-    LABEL(9,"Back to menu",backToMenu)
-};
-Button buttonsRoom[]={
     SELECTOR(3,"Minutes:",minutesStr,decMinutes,incMinutes),
-    LABEL(7,"Play",playHuman),
-    LABEL(9,"Back to menu",backToMenu)
+    SELECTOR(6,"CPU Lvl:",cpuLvlStr,decCpuLvl,incCpuLvl),
+    LABEL(9,"Play",playCPU),
+    LABEL(11,"Back to menu",backToMenu)
+};
+roomCode[9];
+Button buttonsRoom[]={
+    LABEL(3,"Room Code:",NULL),
+    LABEL(4,roomCode,NULL),
+    SELECTOR(6,"Minutes:",minutesStr,decMinutes,incMinutes),
+    LABEL(9,"Play",playHuman),
+    LABEL(11,"Back to menu",backToMenu)
 };
 typedef struct Menu {
     Button *buttons;
@@ -457,6 +460,7 @@ void playCPU(){
 }
 void newRoom(){
     menu = menus+2;
+    sprintf(roomCode, "fartfoil");
 }
 void backToMenu(){
     menu = menus;
