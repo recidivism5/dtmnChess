@@ -292,39 +292,6 @@ Theme *theme = themes+1;
 #define WND_HEIGHT (SCALE*HEIGHT)
 u32 frameBuffer[WIDTH*HEIGHT];
 #define FAT(x,y) ((y)*WIDTH + (x))
-#if _WIN32
-#undef UNICODE
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <dwmapi.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment (lib, "Ws2_32.lib")
-#pragma comment (lib, "Mswsock.lib")
-#pragma comment (lib, "AdvApi32.lib")
-#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
-#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
-#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
-struct BMI {
-    BITMAPINFOHEADER    bmiHeader;
-    RGBQUAD             bmiColors[3];
-} bmi;
-HDC hdc;
-bool socketReady = FALSE;
-SOCKET sock;
-struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
-#elif __APPLE__
-#include <Cocoa/Cocoa.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-#include <errno.h>
-id window;
-int sock;
-#endif
-char title[] = "dtmnChess";
 #define GLYPH_WIDTH 6
 #define GLYPH_HEIGHT 8
 unsigned char font[]={0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x5e,0x0,0x0,0x0,0x0,0x0,0x6,0x0,0x6,0x0,0x0,0x14,0x3e,0x14,0x3e,0x14,0x0,0x4c,0xfb,0x52,0x20,0x0,0x0,0x62,0x10,0x8,0x46,0x0,0x40,0xac,0xb2,0x4c,0xa0,0x90,0x0,0x0,0x0,0x6,0x0,0x0,0x0,0x3c,0x42,0x81,0x81,0x0,0x0,0x81,0x81,0x42,0x3c,0x0,0x0,0x0,0xa,0x4,0xa,0x0,0x0,0x10,0x10,0x7c,0x10,0x10,0x0,0x0,0xa0,0x60,0x0,0x0,0x0,0x8,0x8,0x8,0x8,0x0,0x0,0x0,0x60,0x60,0x0,0x0,0x0,0xc0,0x30,0xc,0x3,0x0,0x0,0x7e,0xe1,0x99,0x87,0x7e,0x0,0x84,0x82,0xff,0x80,0x80,0x0,0xc6,0xa1,0x91,0x89,0x86,0x0,0x46,0x81,0x89,0x89,0x76,0x0,0x30,0x2c,0x22,0xff,0x20,0x0,0x9f,0x91,0x89,0x89,0x71,0x0,0x7e,0xa1,0x91,0x91,0x66,0x0,0x1,0x1,0xe1,0x19,0x7,0x0,0x76,0x89,0x89,0x89,0x76,0x0,0x8e,0x91,0x91,0x91,0x7e,0x0,0x0,0x66,0x66,0x0,0x0,0x0,0x0,0xa6,0x66,0x0,0x0,0x0,0x10,0x28,0x44,0x0,0x0,0x0,0x24,0x24,0x24,0x24,0x0,0x0,0x0,0x44,0x28,0x10,0x0,0x0,0x2,0x1,0x99,0x9,0x6,0x3e,0x41,0x4d,0x5d,0x51,0x5e,0x0,0x78,0x16,0x11,0x16,0x78,0x0,0x7f,0x49,0x49,0x49,0x36,0x0,0x3e,0x41,0x41,0x41,0x22,0x0,0x7f,0x41,0x41,0x41,0x3e,0x0,0x7f,0x49,0x49,0x49,0x49,0x0,0x7f,0x9,0x9,0x9,0x1,0x0,0x3e,0x41,0x51,0x51,0x72,0x0,0x7f,0x8,0x8,0x8,0x7f,0x0,0x41,0x41,0x7f,0x41,0x41,0x0,0x31,0x41,0x41,0x3f,0x1,0x0,0x7f,0x8,0x14,0x22,0x41,0x0,0x7f,0x40,0x40,0x40,0x40,0x0,0x7f,0x2,0x4,0x2,0x7f,0x0,0x7f,0x3,0x1c,0x60,0x7f,0x0,0x3e,0x41,0x41,0x41,0x3e,0x0,0x7f,0x9,0x9,0x9,0x6,0x0,0x3e,0x41,0x31,0x61,0x5e,0x0,0x7f,0x11,0x31,0x51,0x4e,0x0,0x26,0x49,0x49,0x49,0x32,0x0,0x1,0x1,0x7f,0x1,0x1,0x0,0x3f,0x40,0x40,0x40,0x3f,0x0,0x1f,0x20,0x40,0x20,0x1f,0x0,0x3f,0x40,0x30,0x40,0x3f,0x0,0x63,0x14,0x8,0x14,0x63,0x0,0x3,0x4,0x78,0x4,0x3,0x0,0x61,0x51,0x49,0x45,0x43,0x0,0xff,0x81,0x81,0x81,0x81,0x0,0x3,0xc,0x30,0xc0,0x0,0x0,0x81,0x81,0x81,0x81,0xff,0x0,0x4,0x2,0x1,0x2,0x4,0x80,0x80,0x80,0x80,0x80,0x80,0x0,0x0,0x1,0x2,0x4,0x0,0x0,0x0,0x20,0x54,0x54,0x78,0x0,0x7f,0x48,0x48,0x30,0x0,0x0,0x38,0x44,0x44,0x44,0x28,0x0,0x0,0x30,0x48,0x48,0x7f,0x0,0x38,0x54,0x54,0x54,0x58,0x0,0x8,0x7e,0x9,0x9,0x2,0x0,0x40,0x98,0xa4,0xa4,0xf8,0x0,0x7f,0x8,0x8,0x70,0x0,0x0,0x0,0x0,0x7a,0x0,0x0,0x0,0x40,0x80,0x80,0x7a,0x0,0x0,0x7f,0x10,0x28,0x44,0x0,0x0,0x0,0x3f,0x40,0x0,0x0,0x0,0x78,0x4,0x8,0x4,0x78,0x0,0x0,0x7c,0x4,0x4,0x78,0x0,0x38,0x44,0x44,0x44,0x38,0x0,0x0,0xfc,0x24,0x24,0x18,0x0,0x0,0x18,0x24,0x24,0xfc,0x0,0x7c,0x8,0x4,0x4,0x8,0x0,0x8,0x54,0x54,0x54,0x20,0x0,0x4,0x3f,0x44,0x24,0x0,0x0,0x0,0x3c,0x40,0x40,0x7c,0x0,0xc,0x30,0x40,0x30,0xc,0x0,0x1c,0x60,0x10,0x60,0x1c,0x0,0x44,0x28,0x10,0x28,0x44,0x0,0x40,0x8c,0x90,0x90,0x7c,0x0,0x0,0x44,0x64,0x54,0x4c,0x0,0x10,0x56,0xa9,0x81,0x0,0x0,0x0,0x0,0xff,0x0,0x0,0x0,0x81,0xa9,0x56,0x10,0x0,0x0,0x10,0x8,0x10,0x8,0x0,};
@@ -415,61 +382,89 @@ void playCPU(){
     game.s = rand() % 2;
     if (game.s) doMove(&game.b, bestMove(&game.b));
 }
+void newRoom(){
+
+}
+void joinRoom(){
+
+}
+void playHuman(){
+
+}
+void backToMenu(){
+
+}
 void decTheme();
 void incTheme();
+#if _WIN32
+#undef UNICODE
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment (lib, "Ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
+SOCKET sock;
+struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
+#elif __APPLE__
+#include <Cocoa/Cocoa.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <pthread.h>
+#include <errno.h>
+id window;
+int sock;
+#endif
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
-void playHuman();
-Button buttons[]={
-    CHARPOS(0,0),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Minutes:",NULL,
-    CHARPOS(0,1),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,minutesStr,NULL,
-    2+CHARPOS(2,1),GLYPH_WIDTH,GLYPH_HEIGHT,"<",decMinutes,
-    2+CHARPOS(13,1),GLYPH_WIDTH,GLYPH_HEIGHT,">",incMinutes,
-    CHARPOS(0,2),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"CPU Lvl:",NULL,
-    CHARPOS(0,3),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT, cpuLvlStr,NULL,
-    2+CHARPOS(2,3),GLYPH_WIDTH,GLYPH_HEIGHT,"<",decCpuLvl,
-    2+CHARPOS(13,3),GLYPH_WIDTH,GLYPH_HEIGHT,">",incCpuLvl,
-    CHARPOS(0,5),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Play CPU",playCPU,
-    CHARPOS(0,7),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Play Human",playHuman,
-    CHARPOS(0,10),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,"Theme:",NULL,
-    CHARPOS(0,11),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,NULL,NULL,
-    2+CHARPOS(2,11),GLYPH_WIDTH,GLYPH_HEIGHT,"<",decTheme,
-    2+CHARPOS(13,11),GLYPH_WIDTH,GLYPH_HEIGHT,">",incTheme,
+#define LABEL(y, str, func) CHARPOS(0,y),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,str,func
+#define SELECTOR(y, label, str, dec, inc) LABEL(y,label,NULL),\
+                                          LABEL(y+1,str,NULL),\
+                                          2+CHARPOS(2,y+1),GLYPH_WIDTH,GLYPH_HEIGHT,"<",dec,\
+                                          2+CHARPOS(13,y+1),GLYPH_WIDTH,GLYPH_HEIGHT,">",inc
+Button buttonsMain[]={
+    LABEL(5,"Play CPU",playCPU),
+    LABEL(6,"New Room",newRoom),
+    LABEL(7,"Join Room",joinRoom),
+    SELECTOR(8,"Theme:",NULL,decTheme,incTheme)
 };
+Button buttonsCPU[]={
+    SELECTOR(1,"Minutes:",minutesStr,decMinutes,incMinutes),
+    SELECTOR(3,"CPU Lvl:",cpuLvlStr,decCpuLvl,incCpuLvl),
+    LABEL(5,"Play",playCPU),
+    LABEL(8,"Back to menu",backToMenu)
+};
+Button buttonsRoom[]={
+    SELECTOR(3,"Minutes:",minutesStr,decMinutes,incMinutes),
+    LABEL(5,"Play",playHuman),
+    LABEL(8,"Back to menu",backToMenu)
+};
+typedef struct Menu {
+    Button *buttons;
+    int buttonCount;
+}Menu;
+Menu menus[]={
+    buttonsMain,COUNT(buttonsMain),
+    buttonsCPU,COUNT(buttonsCPU),
+    buttonsRoom,COUNT(buttonsRoom)
+};
+Menu *menu = menus;
 void decTheme(){
     if (theme-themes > 0){
         theme--;
-        buttons[11].str = theme->name;
+        buttonsMain[4].str = theme->name;
     }
 }
 void incTheme(){
     if (theme-themes+1 < COUNT(themes)){
         theme++;
-        buttons[11].str = theme->name;
+        buttonsMain[4].str = theme->name;
     }
 }
 char mousePos[32];
-void draw(){
-    for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = theme->rightPanel;
-    for (int y = 0; y < 8; y++){
-        for (int x = 0; x < 8; x++){
-            int scrY = game.s ? y : 7-y,
-                scrX = game.s ? 7-x : x;
-            fillRect(scrX*CELL_WIDTH,scrY*CELL_WIDTH, CELL_WIDTH,CELL_WIDTH, theme->board[(scrX%2)^(scrY%2)]);
-            u8 c = getCell(&game.b, x,y);
-            if (piece(c)) drawPiece(pieceImgs[piece(c)-1], theme->piece[side(c)], scrX*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, scrY*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
-        }
-    }
-    drawString(0,0, mousePos);
-    //if (won == gSide) drawString(50,50, "You won");
-    //else if (won == !gSide) drawString(50,50, "You lost");
-    for (int i = 0; i < COUNT(buttons); i++) drawButton(buttons+i);
-#if _WIN32
-    StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
-#elif __APPLE__
-    [[window contentView] setNeedsDisplay:YES];
-#endif
-}
-void findGame(){
+/*void findGame(){
 #if _WIN32
     struct addrinfo *result = NULL,
                     *ptr = NULL;
@@ -527,61 +522,20 @@ void playHuman(){
         pthread_create(&pt, NULL, findGame, NULL);
 #endif
     }
-}
-void mouseMove(int x, int y){
-    for (int i = 0; i < COUNT(buttons); i++){
-        Button *b = buttons+i;
-        if ((b->func) &&
-        (b->x <= x) &&
-        (x < (b->x+b->width)) &&
-        (b->y <= y) &&
-        (y < (b->y+b->height))){
-            if (hoveredButton != b){
-                hoveredButton = b;
-                draw();
-            }
-            return;
-        }
-    }
-    if (hoveredButton){
-        hoveredButton = NULL;
-        draw();
-    }
-}
+}*/
 Move uMove;
-void mouseLeftDown(int x, int y){
-    uMove.tx = game.s ? 7-x/CELL_WIDTH : x/CELL_WIDTH,
-    uMove.ty = game.s ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
-    if (uMove.tx < 8){
-        u8 c = getCell(&game.b, uMove.tx,uMove.ty);
-        if (game.s == side(c) && piece(c)){
-            uMove.x = uMove.tx;
-            uMove.y = uMove.ty;
-        } else {
-            if (uMove.x >= 0){
-                if (game.t==gameNone && moveLegalChecked(&game.b, uMove)){
-                    doMove(&game.b, uMove);
-                    game.s = !game.s;
-                } else if (game.t==gameCPU && moveLegalChecked(&game.b, uMove)){
-                    doMove(&game.b, uMove);
-                    doMove(&game.b, bestMove(&game.b));
-                }
-            }
-            uMove.x = -1;
-        }
-    }
-    if (hoveredButton) hoveredButton->func();
-    draw();
-}
-void mouseRightDown(int x, int y){
-}
-void charInput(char c){
-}
-void init(){
-    setBoard(&game.b);
-    buttons[11].str = theme->name;
-}
 #if _WIN32
+#include <dwmapi.h>
+char title[] = "dtmnChess";
+#define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
+#define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+struct BMI {
+    BITMAPINFOHEADER    bmiHeader;
+    RGBQUAD             bmiColors[3];
+} bmi;
+HDC hdc;
+#define DRAW() InvalidateRect(hwnd, NULL, FALSE)
 LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
     BOOL t = TRUE;
     switch (msg){
@@ -598,67 +552,36 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
         }
         return DefWindowProc(hwnd, msg, wparam, lparam);
     }
-    case WM_MOUSEMOVE:
-        mouseMove(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
-        return 0;
-    case WM_LBUTTONDOWN:
-        mouseLeftDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
-        return 0;
-    case WM_RBUTTONDOWN:
-        mouseRightDown(GET_X_LPARAM(lparam)/SCALE, GET_Y_LPARAM(lparam)/SCALE);
-        return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
-    }
-    return DefWindowProcA(hwnd, msg, wparam, lparam);
-}
-WNDCLASSA wc = {0,WindowProc,0,0,NULL,NULL,NULL,NULL,NULL,title};
-HWND wnd;
-MSG msg;
-RECT wr;
-void startWSA(){
-    WSADATA wsaData;
-    WSAStartup(MAKEWORD(2,2), &wsaData);
-    socketReady = TRUE;
-}
-int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int nCmdShow){
-    /*AllocConsole();
-    FILE* fDummy;
-    freopen_s(&fDummy, "CONOUT$", "w", stdout);*/
-    CreateThread(NULL, 0, startWSA, NULL, 0, NULL);
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_BITFIELDS;
-    bmi.bmiHeader.biWidth = WIDTH;
-    bmi.bmiHeader.biHeight = -HEIGHT;
-    bmi.bmiColors[0].rgbRed = 0xff;
-    bmi.bmiColors[1].rgbGreen = 0xff;
-    bmi.bmiColors[2].rgbBlue = 0xff;
-    wc.hInstance = hCurrentInst;
-    wc.hIcon = LoadIconA(0,IDI_APPLICATION);
-    wc.hCursor = LoadCursorA(0,IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)CreateSolidBrush(BACKGROUND_COLOR);
-    RegisterClassA(&wc);
-    wr.right = WND_WIDTH;
-    wr.bottom = WND_HEIGHT;
-    AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW^WS_THICKFRAME, FALSE);
-    wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW^WS_THICKFRAME,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
-    hdc = GetDC(wnd);
-    init();
-    draw();
-    while (GetMessageA(&msg, NULL, 0, 0)){
-        TranslateMessage(&msg);
-        DispatchMessageA(&msg);
-    }
-    return msg.wParam;
-}
+    case WM_PAINT:{
 #elif __APPLE__
+#define DRAW() [[window contentView] setNeedsDisplay:YES]
 @interface FBView : NSView<NSTextInputClient>
 @end
 @implementation FBView
 - (void)drawRect:(NSRect)rect {
+#endif
+    //draw here
+    for (int i = 0; i < (WIDTH*HEIGHT); i++) frameBuffer[i] = theme->rightPanel;
+    for (int y = 0; y < 8; y++){
+        for (int x = 0; x < 8; x++){
+            int scrY = game.s ? y : 7-y,
+                scrX = game.s ? 7-x : x;
+            fillRect(scrX*CELL_WIDTH,scrY*CELL_WIDTH, CELL_WIDTH,CELL_WIDTH, theme->board[(scrX%2)^(scrY%2)]);
+            u8 c = getCell(&game.b, x,y);
+            if (piece(c)) drawPiece(pieceImgs[piece(c)-1], theme->piece[side(c)], scrX*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, scrY*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
+        }
+    }
+    drawString(0,0, mousePos);
+    for (int i = 0; i < menu->buttonCount; i++) drawButton(menu->buttons+i);
+#if _WIN32
+    StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
+}
+case WM_MOUSEMOVE:{
+    int x = GET_X_LPARAM(lparam)/SCALE, y = GET_Y_LPARAM(lparam)/SCALE;
+#elif __APPLE__
     CGContextRef context = [[NSGraphicsContext currentContext] CGContext];
     CGContextSetInterpolationQuality(context, 1);
     CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
@@ -692,131 +615,83 @@ int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpsz
 }
 - (void)mouseMoved:(NSEvent *)event {
     NSPoint p = [event locationInWindow];
-    mouseMove(p.x/SCALE, HEIGHT-(p.y+2)/SCALE);
-}
-- (void)mouseDown:(NSEvent *) event {
-    NSPoint p = [event locationInWindow];
-    mouseLeftDown(p.x/SCALE, HEIGHT-(p.y+2)/SCALE);
-}
-- (void)rightMouseDown:(NSEvent *)event {
-    NSPoint p = [event locationInWindow];
-    mouseRightDown(p.x/SCALE, HEIGHT-(p.y+2)/SCALE);
-}
-- (void)mouseUp:(NSEvent*)event {
-}
-- (void)rightMouseUp:(NSEvent*)event {
-}
-- (void)otherMouseDown:(NSEvent *)event {
-}
-- (void)otherMouseUp:(NSEvent *)event {
-}
-- (void)scrollWheel:(NSEvent *)event {
-}
-- (void)mouseDragged:(NSEvent *)event {
-    [self mouseMoved:event];
-}
-- (void)rightMouseDragged:(NSEvent *)event {
-    [self mouseMoved:event];
-}
-- (void)otherMouseDragged:(NSEvent *)event {
-    [self mouseMoved:event];
-}
-- (void)mouseExited:(NSEvent *)event {
-    printf("mouse exit\n");
-}
-- (void)mouseEntered:(NSEvent *)event {
-    printf("mouse enter\n");
-}
-- (BOOL)canBecomeKeyView {
-    return YES;
-}
-- (NSView *)nextValidKeyView {
-    return self;
-}
-- (NSView *)previousValidKeyView {
-    return self;
-}
-- (BOOL)acceptsFirstResponder {
-    return YES;
-}
-- (void)viewDidMoveToWindow {
-}
-- (void)dealloc {
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
-    [super dealloc];
-}
-#pragma mark NSTextInputClient
-- (void)doCommandBySelector:(nonnull SEL)selector {
-}
-- (nullable NSAttributedString *)attributedSubstringForProposedRange:(NSRange)range actualRange:(nullable NSRangePointer)actualRange {
-    return nil;
-}
-- (void)insertText:(nonnull id)string replacementRange:(NSRange)replacementRange {
-    NSString    *characters;
-    NSUInteger  codepoint;
-
-    if ([string isKindOfClass:[NSAttributedString class]])
-        characters = [string string];
-    else
-        characters = (NSString*) string;
-
-    NSRange range = NSMakeRange(0, [characters length]);
-    while (range.length) {
-        codepoint = 0;
-        if ([characters getBytes:&codepoint
-            maxLength:sizeof(codepoint)
-            usedLength:NULL
-            encoding:NSUTF32StringEncoding
-            options:0
-            range:range
-            remainingRange:&range]) {
-
-            if ((codepoint & 0xff00) == 0xf700)
-                continue;
-
-            charInput((char)codepoint);
+    int x = p.x/SCALE, y = HEIGHT-(p.y+2)/SCALE;
+#endif
+    //mouseMove here
+    for (int i = 0; i < menu->buttonCount; i++){
+        Button *b = menu->buttons+i;
+        if ((b->func) &&
+        (b->x <= x) &&
+        (x < (b->x+b->width)) &&
+        (b->y <= y) &&
+        (y < (b->y+b->height))){
+            if (hoveredButton != b){
+                hoveredButton = b;
+                DRAW();
+            }
+            return;
         }
     }
+    if (hoveredButton){
+        hoveredButton = NULL;
+        DRAW();
+    }
 }
-- (NSUInteger)characterIndexForPoint:(NSPoint)point {
-    return 0;
+#if _WIN32
+case WM_LBUTTONDOWN:{
+    int x = GET_X_LPARAM(lparam)/SCALE, y = GET_Y_LPARAM(lparam)/SCALE;
+#elif __APPLE__
+- (void)mouseDown:(NSEvent *) event {
+    NSPoint p = [event locationInWindow];
+    int x = p.x/SCALE, y = HEIGHT-(p.y+2)/SCALE;
+#endif
+    //mouseLeftDown here
+    uMove.tx = game.s ? 7-x/CELL_WIDTH : x/CELL_WIDTH;
+    uMove.ty = game.s ? y/CELL_WIDTH : 7-y/CELL_WIDTH;
+    if (uMove.tx < 8){
+        u8 c = getCell(&game.b, uMove.tx,uMove.ty);
+        if (game.s == side(c) && piece(c)){
+            uMove.x = uMove.tx;
+            uMove.y = uMove.ty;
+        } else {
+            if (uMove.x >= 0){
+                if (game.t==gameNone && moveLegalChecked(&game.b, uMove)){
+                    doMove(&game.b, uMove);
+                    game.s = !game.s;
+                } else if (game.t==gameCPU && moveLegalChecked(&game.b, uMove)){
+                    doMove(&game.b, uMove);
+                    doMove(&game.b, bestMove(&game.b));
+                }
+            }
+            uMove.x = -1;
+        }
+    }
+    if (hoveredButton) hoveredButton->func();
+    DRAW();
 }
-- (NSRect)firstRectForCharacterRange:(NSRange)range actualRange:(nullable NSRangePointer)actualRange {
-    return NSMakeRect(0.0, 0.0, 0.0, 0.0);
+#if _WIN32
+    }
+    return DefWindowProcA(hwnd, msg, wparam, lparam);
 }
-static const NSRange kEmptyRange = { NSNotFound, 0 };
-- (BOOL)hasMarkedText {
-    return false;
-}
-- (NSRange)markedRange {
-    return kEmptyRange;
-}
-- (NSRange)selectedRange {
-    return kEmptyRange;
-}
-- (void)setMarkedText:(nonnull id)string selectedRange:(NSRange)selectedRange replacementRange:(NSRange)replacementRange {
-}
-- (void)unmarkText {
-}
-- (nonnull NSArray<NSString *> *)validAttributesForMarkedText {
-    return [NSArray array];
-}
+WNDCLASSA wc = {0,WindowProc,0,0,NULL,NULL,NULL,NULL,NULL,title};
+HWND wnd;
+MSG msg;
+RECT wr;
+int APIENTRY WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst, LPSTR lpszCmdLine, int nCmdShow){
+#elif __APPLE__
 @end
-
 @interface FBWindow : NSWindow<NSWindowDelegate>
 @end
 @implementation FBWindow
 - (id)initWithContentRect:(NSRect)contentRect
 styleMask:(NSWindowStyleMask)windowStyle
 backing:(NSBackingStoreType)bufferingType
-defer:(BOOL)deferCreation
-{
+defer:(BOOL)deferCreation{
     self = [super
         initWithContentRect:contentRect
         styleMask:windowStyle
         backing:bufferingType
         defer:deferCreation];
-
     if (self){
         self.delegate = self;
         NSRect bounds = [self frame];
@@ -833,25 +708,55 @@ defer:(BOOL)deferCreation
     [self.contentView interpretKeyEvents:@[event]];
 }
 @end
-
-id applicationName;
 int main(){
+#endif
+    //init here
+    setBoard(&game.b);
+    menu->buttons[4].str = theme->name;
+#if _WIN32
+    AllocConsole();
+    FILE* fDummy;
+    freopen_s(&fDummy, "CONOUT$", "w", stdout);
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_BITFIELDS;
+    bmi.bmiHeader.biWidth = WIDTH;
+    bmi.bmiHeader.biHeight = -HEIGHT;
+    bmi.bmiColors[0].rgbRed = 0xff;
+    bmi.bmiColors[1].rgbGreen = 0xff;
+    bmi.bmiColors[2].rgbBlue = 0xff;
+    wc.hInstance = hCurrentInst;
+    wc.hIcon = LoadIconA(0,IDI_APPLICATION);
+    wc.hCursor = LoadCursorA(0,IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)CreateSolidBrush(BACKGROUND_COLOR);
+    RegisterClassA(&wc);
+    wr.right = WND_WIDTH;
+    wr.bottom = WND_HEIGHT;
+    AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW^WS_THICKFRAME, FALSE);
+    wnd = CreateWindowExA(0,title,title,WS_VISIBLE|WS_OVERLAPPEDWINDOW^WS_THICKFRAME,CW_USEDEFAULT,CW_USEDEFAULT,wr.right-wr.left,wr.bottom-wr.top,NULL,NULL,wc.hInstance,NULL);
+    hdc = GetDC(wnd);
+    InvalidateRect(wnd, NULL, FALSE);
+    while (GetMessageA(&msg, NULL, 0, 0)){
+        TranslateMessage(&msg);
+        DispatchMessageA(&msg);
+    }
+    return msg.wParam;
+}
+#elif __APPLE__
     @autoreleasepool{
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-        applicationName = [[NSProcessInfo processInfo] processName];
         window = [[FBWindow alloc] initWithContentRect:NSMakeRect(0, 0, WND_WIDTH, WND_HEIGHT)
             styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable
             backing:NSBackingStoreBuffered defer:NO];
         [window center];
-        [window setTitle: applicationName];
+        [window setTitle: [[NSProcessInfo processInfo] processName]];
         NSAppearance* appearance = [NSAppearance appearanceNamed:NSAppearanceNameVibrantDark];
         [window setAppearance:appearance];
         [window makeKeyAndOrderFront:nil];
         [window setAcceptsMouseMovedEvents:YES];
         [NSApp activateIgnoringOtherApps:YES];
-        init();
-        draw();
         [NSApp run];
     }
     return 0;
