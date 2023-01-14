@@ -402,18 +402,14 @@ void incCpuLvl(){
     }
 }
 void playCPU();
-void newRoom(){
-
-}
+void newRoom();
 void joinRoom(){
 
 }
 void playHuman(){
 
 }
-void backToMenu(){
-
-}
+void backToMenu();
 void decTheme();
 void incTheme();
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
@@ -423,10 +419,10 @@ void incTheme();
                                           2+CHARPOS(2,y+1),GLYPH_WIDTH,GLYPH_HEIGHT,"<",dec,\
                                           2+CHARPOS(13,y+1),GLYPH_WIDTH,GLYPH_HEIGHT,">",inc
 Button buttonsMain[]={
-    LABEL(5,"Play CPU",playCPU),
+    LABEL(4,"Play CPU",playCPU),
     LABEL(6,"New Room",newRoom),
-    LABEL(7,"Join Room",joinRoom),
-    SELECTOR(8,"Theme:",NULL,decTheme,incTheme)
+    LABEL(8,"Join Room",joinRoom),
+    SELECTOR(10,"Theme:",NULL,decTheme,incTheme)
 };
 Button buttonsCPU[]={
     SELECTOR(1,"Minutes:",minutesStr,decMinutes,incMinutes),
@@ -458,6 +454,12 @@ void playCPU(){
     game.t = gameCPU;
     game.s = rand() % 2;
     if (game.s) doMove(&game.b, bestMove(&game.b));
+}
+void newRoom(){
+    menu = menus+2;
+}
+void backToMenu(){
+    menu = menus;
 }
 void decTheme(){
     if (theme-themes > 0){
