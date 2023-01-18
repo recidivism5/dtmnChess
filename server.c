@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <time.h>
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -13,6 +14,7 @@ typedef bool Side;
 #define COUNT(arr) (sizeof(arr)/sizeof(*arr))
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
+#define FOR(var, count) for (int var = 0; var < (count); var++)
 typedef enum Piece {none,pawn,rook,knight,bishop,queen,king}Piece;
 typedef enum Flag {
     turn = 1,
@@ -211,44 +213,89 @@ int getWin(Board *b){ //-1: in progress, 0: 0 won, 1: 1 won, 2: stalemate
 #pragma comment (lib, "Ws2_32.lib")
 char port[]="6464";
 struct addrinfo hints = {AI_PASSIVE,AF_INET,SOCK_STREAM,IPPROTO_TCP};
-int minutesOptions[] = {1,3,5,10};
-SOCKET pool[COUNT(minutesOptions)];
+typedef struct Room {
+    u8 code[8];
+    SOCKET socks[2];
+}Room;
+Room rooms[1024];
+char codeSymbols[]="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+//pthread_mutex_t lock;
+CRITICAL_SECTION lock;
 void handleClient(SOCKET *p){
-    u8 min;
-    recv(*p, &min, sizeof(min), 0);
-    for (int i = 0; i < COUNT(minutesOptions); i++){
-        if (min == minutesOptions[i]){
-            if (pool[i]){
-                SOCKET s[2] = {*p, pool[i]};
-                pool[i] = 0;
-                u8 n0[8], n1[8];
-                recv(s[0], n0, sizeof(n0), 0);
-                recv(s[1], n1, sizeof(n1), 0);
-                send(s[1], n0, sizeof(n0), 0);
-                send(s[0], n1, sizeof(n1), 0);
-                u8 side = rand() % 2; //if side == 0, p[0] = 0 and p[1] = 1, else p[0] = 1 and p[1] = 0
-                send(s[0], &side, sizeof(side), 0);
-                side = !side;
-                send(s[1], &side, sizeof(side), 0);
-                side = !side;
-                Board board;
-                setBoard(&board);
-                Move move;
-                while (-1 == getWin(&board)){
-                    recv(s[side], &move, sizeof(move), 0);
-                    side = !side;
-                    send(s[side], &move, sizeof(move), 0);
+    srand(time(NULL));
+    u8 code[8];
+    u8 zero = 0;
+    if (recv(*p, code, 1, 0) < 1) goto EXC;
+    if (code[0]){
+        if (recv(*p, code+1, sizeof(code)-1, 0) < 1) goto EXC;
+        //pthread_mutex_lock(&lock);
+        EnterCriticalSection(&lock);
+        for (int i = 0; i < COUNT(rooms); i++){
+            if (rooms[i].socks[0] && !rooms[i].socks[1]){
+                for (int j = 0; j < sizeof(code); j++) if (rooms[i].code[j] != code[j]) goto EX;
+                Room *r = rooms+i;
+                r->socks[1] = *p;
+                //pthread_mutex_unlock(&lock);
+                LeaveCriticalSection(&lock);
+                u8 one = 1;
+                FOR(j,2) if (send(r->socks[j], &one, 1, 0) < 1) goto CLOSE;
+                POLL:
+                u8 mins[2] = {0,0};
+                while (!(mins[0]==mins[1] && mins[0])){
+                    FOR(j,2) if (recv(r->socks[j], mins+j, 1, 0) < 1) goto CLOSE;
+                    FOR(j,2) if (send(r->socks[1-j], mins+j, 1, 0) < 1) goto CLOSE;
                 }
-                closesocket(s[0]);
-                closesocket(s[1]);
-            } else pool[i] = *p;
-            break;
+                FOR(j,2) if (recv(r->socks[j], mins, 1, 0) < 1) goto CLOSE;
+                u8 side = rand() % 2;
+                mins[0] = mins[1] | (1<<7) | (side<<6);// 1: (0:1,1:0), 0: (0:0,1:1)
+                FOR(j,2){
+                    if (send(r->socks[j], mins, 1, 0) < 1) goto CLOSE;
+                    side = !side;
+                    mins[0] = mins[1] | (1<<7) | (side<<6);
+                }
+                side = !side;
+                Board b;
+                setBoard(&b);
+                Move m;
+                while (getWin(&b) < 0){
+                    if (recv(r->socks[side], &m, sizeof(m), 0) < 1) goto CLOSE;
+                    side = !side;
+                    if (send(r->socks[side], &m, sizeof(m), 0) < 1) goto CLOSE;
+                    doMove(&b, m);
+                }
+                goto POLL;
+                CLOSE:
+                closesocket(r->socks[0]);
+                r->socks[0] = 0;
+                r->socks[1] = 0;
+                goto EXC;
+            }
+        }
+    } else {
+        FOR(i,sizeof(code)) code[i] = codeSymbols[rand() % (COUNT(codeSymbols)-1)];
+        if (send(*p, code, sizeof(code), 0) < 1) goto EXC;
+        //pthread_mutex_lock(&lock);
+        EnterCriticalSection(&lock);
+        for (int i = 0; i < COUNT(rooms); i++){
+            if (!rooms[i].socks[0]){
+                Room *r = rooms+i;
+                r->socks[0] = *p;
+                //pthread_mutex_unlock(&lock);
+                LeaveCriticalSection(&lock);
+                free(p); //socket sitting in room will eventually time out. what to do about that? I think we'll just keep this thread alive and talk to it every 10 seconds
+                return;
+            }
         }
     }
+    EX:
+    //pthread_mutex_unlock(&lock);
+    LeaveCriticalSection(&lock);
+    EXC:
+    closesocket(*p);
     free(p);
 }
 int main(){
-    srand(69);
+    InitializeCriticalSectionAndSpinCount(&lock,0);
     WSADATA wsaData;
     int iResult;
     SOCKET ls = INVALID_SOCKET;
@@ -292,7 +339,7 @@ int main(){
     while (1){
         SOCKET *p = malloc(sizeof(SOCKET));
         *p = accept(ls, NULL, NULL);
-        CreateThread(0, 1024, handleClient, p, 0, 0);
+        CloseHandle(CreateThread(0, 1024, handleClient, p, 0, 0));
     }
     closesocket(ls);
     WSACleanup();

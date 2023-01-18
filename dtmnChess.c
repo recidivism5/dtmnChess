@@ -15,6 +15,9 @@ typedef bool Side;
 #define COUNT(arr) (sizeof(arr)/sizeof(*arr))
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
+bool isAlphaNumeric(char c){
+    return ('0'<=c && (c<='9')) || ('A'<=c && (c<='Z')) || ('a'<=c && (c<='z'));
+}
 typedef enum Piece {none,pawn,rook,knight,bishop,queen,king}Piece;
 typedef enum Flag {
     turn = 1,
@@ -358,6 +361,7 @@ void drawButton(Button *b){
 #pragma comment (lib, "AdvApi32.lib")
 HWND window;
 #define DRAW() InvalidateRect(window, NULL, FALSE)
+#define THREAD(func) CloseHandle(CreateThread(NULL, 0, func, NULL, 0, NULL))
 SOCKET sock;
 struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
 #elif __APPLE__
@@ -370,6 +374,7 @@ struct addrinfo hints = {0,AF_UNSPEC,SOCK_STREAM,IPPROTO_TCP};
 #include <errno.h>
 id window;
 #define DRAW() [[window contentView] setNeedsDisplay:YES]
+#define THREAD(func) pthread_t _pt; pthread_create(&_pt, NULL, func, NULL); pthread_detach(_pt)
 int sock;
 #endif
 int minutesOptions[]={1, 3, 5, 10};
@@ -401,14 +406,12 @@ void incCpuLvl(){
         sprintf(cpuLvlStr, "%d", cpuLvl);
     }
 }
+void menuToCPU();
 void playCPU();
 void newRoom();
-void joinRoom(){
-
-}
-void playHuman(){
-
-}
+void menuToJoin();
+void selectCode();
+void joinRoom();
 void backToMenu();
 void decTheme();
 void incTheme();
@@ -419,9 +422,9 @@ void incTheme();
                                           2+CHARPOS(2,y+1),GLYPH_WIDTH,GLYPH_HEIGHT,"<",dec,\
                                           2+CHARPOS(13,y+1),GLYPH_WIDTH,GLYPH_HEIGHT,">",inc,
 Button buttonsMain[]={
-    LABEL(4,"Play CPU",playCPU)
+    LABEL(4,"Play CPU",menuToCPU)
     LABEL(6,"New Room",newRoom)
-    LABEL(8,"Join Room",joinRoom)
+    LABEL(8,"Join Room",menuToJoin)
     SELECTOR(10,"Theme:",NULL,decTheme,incTheme)
 };
 Button buttonsCPU[]={
@@ -430,13 +433,18 @@ Button buttonsCPU[]={
     LABEL(9,"Play",playCPU)
     LABEL(11,"Back to menu",backToMenu)
 };
-roomCode[9];
+u8 roomCode[9];
 Button buttonsRoom[]={
     LABEL(3,"Room Code:",NULL)
     LABEL(4,roomCode,NULL)
     SELECTOR(6,"Minutes:",minutesStr,decMinutes,incMinutes)
-    LABEL(9,"Play",playHuman)
+    LABEL(9,"Play",NULL)
     LABEL(11,"Back to menu",backToMenu)
+};
+Button buttonsCode[]={
+    LABEL(6,"Enter Code:",NULL)
+    LABEL(7,roomCode,selectCode)
+    LABEL(9,"Join",joinRoom)
 };
 typedef struct Menu {
     Button *buttons;
@@ -445,25 +453,57 @@ typedef struct Menu {
 Menu menus[]={
     buttonsMain,COUNT(buttonsMain),
     buttonsCPU,COUNT(buttonsCPU),
-    buttonsRoom,COUNT(buttonsRoom)
+    buttonsRoom,COUNT(buttonsRoom),
+    buttonsCode,COUNT(buttonsCode)
 };
 Menu *menu = menus;
+void menuToCPU(){
+    menu = menus+1;
+}
 void playCPU(){
-    if (menu != (menus+1)){
-        menu = menus+1;
-        return;
-    }
     setBoard(&game.b);
     game.t = gameCPU;
     game.s = rand() % 2;
     if (game.s) doMove(&game.b, bestMove(&game.b));
 }
+void getRoom(){
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2,2), &wsaData);
+    struct addrinfo *result = NULL,
+                    *ptr = NULL;
+    getaddrinfo("surnd.net", "6464", &hints, &result);
+    for (ptr=result; ptr != NULL; ptr=ptr->ai_next){
+        sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+        if (SOCKET_ERROR != connect(sock, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
+        closesocket(sock);
+    }
+    freeaddrinfo(result);
+    u8 zero = 0;
+    send(sock, &zero, sizeof(zero), 0);
+    roomCode[sizeof(roomCode)-1] = 0;
+    recv(sock, roomCode, sizeof(roomCode)-1, 0);
+    DRAW();
+}
 void newRoom(){
     menu = menus+2;
-    sprintf(roomCode, "fartfoil");
+    sprintf(roomCode, "...");
+    THREAD(getRoom);
+}
+void joinRoom(){
+
+}
+bool codeSelected;
+void selectCode(){
+    codeSelected = TRUE;
+}
+void menuToJoin(){
+    sprintf(roomCode,"penis");
+    menu = menus + 3;
+    DRAW();
 }
 void backToMenu(){
     menu = menus;
+    game.t = gameNone;
 }
 void decTheme(){
     if (theme-themes > 0){
@@ -478,65 +518,6 @@ void incTheme(){
     }
 }
 char mousePos[32];
-/*void findGame(){
-#if _WIN32
-    struct addrinfo *result = NULL,
-                    *ptr = NULL;
-    getaddrinfo("surnd.net", "6464", &hints, &result);
-    for (ptr=result; ptr != NULL; ptr=ptr->ai_next){
-        sock = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-        if (SOCKET_ERROR != connect(sock, ptr->ai_addr, (int)ptr->ai_addrlen)) break;
-        closesocket(sock);
-    }
-    freeaddrinfo(result);
-#elif __APPLE__
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    struct hostent *he = gethostbyname("surnd.net");
-    struct sockaddr_in sa;
-    sa.sin_addr = *((struct in_addr *)he->h_addr);
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(6464);
-    if(0 > connect(sock, &sa, sizeof(sa))) perror("connect failed: ");
-#endif
-    send(sock, minutes, sizeof(*minutes), 0);
-    recv(sock, &game.s, sizeof(game.s), 0);
-    draw();
-    if (game.s){
-        recv(sock, &game.m, sizeof(game.m), 0); //get first move if black
-        doMove(&game.b, game.m);
-        draw();
-    }
-}
-void closeGame(){
-#if _WIN32
-    closesocket(sock);
-    WSACleanup();
-#elif __APPLE__
-    close(sock);
-#endif
-    game.t = gameNone;
-}
-void stepGame(){
-    send(sock, &game.m, sizeof(game.m), 0);
-    if (checkWin(&game.b, game.s)) closeGame();
-    else {
-        recv(sock, &game.m, sizeof(game.m), 0);
-        doMove(&game.b, game.m);
-        if (checkWin(&game.b, !game.s)) closeGame();
-    }
-    draw();
-}
-void playHuman(){
-    if (game.t == gameNone){
-        game.t = gameHuman;
-#if _WIN32
-        CreateThread(NULL, 0, findGame, NULL, 0, NULL);
-#elif __APPLE__
-        pthread_t pt;
-        pthread_create(&pt, NULL, findGame, NULL);
-#endif
-    }
-}*/
 Move uMove;
 #if _WIN32
 #include <dwmapi.h>
@@ -567,6 +548,20 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
+    case WM_CHAR:
+        if (isAlphaNumeric(wparam) && codeSelected && (strlen(roomCode) < 8)){
+            roomCode[strlen(roomCode)] = wparam;
+            roomCode[strlen(roomCode)] = 0;
+            DRAW();
+        }
+        return 0;
+    case WM_KEYDOWN:
+        int len = strlen(roomCode);
+        if (wparam == VK_BACK && codeSelected && len){
+            roomCode[len-1] = 0;
+            DRAW();
+        }
+        return 0;
     case WM_PAINT:{
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
@@ -587,7 +582,7 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
             if (piece(c)) drawPiece(pieceImgs[piece(c)-1], theme->piece[side(c)], scrX*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, scrY*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
         }
     }
-    drawString(0,0, mousePos);
+    if (menu == (menus+3)) fillRect(CHARPOS(0,7),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,0);
     for (int i = 0; i < menu->buttonCount; i++) drawButton(menu->buttons+i);
 #if _WIN32
     StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
@@ -666,6 +661,7 @@ case WM_LBUTTONDOWN:{
         }
     }
     if (hoveredButton) hoveredButton->func();
+    else codeSelected = FALSE;
     DRAW();
 #if _WIN32
     return 0;}
