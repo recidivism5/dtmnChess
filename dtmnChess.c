@@ -10,6 +10,9 @@ typedef int8_t i8;
 typedef int32_t i32;
 typedef i8 bool;
 typedef bool Side;
+typedef struct IVec2 {
+    int x,y;
+}IVec2;
 #define TRUE 1
 #define FALSE 0
 #define COUNT(arr) (sizeof(arr)/sizeof(*arr))
@@ -274,16 +277,16 @@ typedef struct Theme {
     char *name;
     u32 board[2],
         piece[2],
+        shadow,
         rightPanel,
         hover,
         text;
 }Theme;
 Theme themes[]={
-    "Classic",0xbeb6a8,0x3c673b,0xeae4db,0x458245,0x3c673b,0x4f884e,0xbeb6a8,
-    "Bee",0xbcaf00,0x343001,0xf0dc00,0x474100,0x343001,0x685f00,0xf0dc00,
+    "Classic",0xbeb6a8,0x3c673b,0xeae4db,0x458245,0,0x3c673b,0x4f884e,0xbeb6a8,
+    "Bee",0xbcaf00,0x343001,0xf0dc00,0x474100,0,0x343001,0x685f00,0xf0dc00,
 };
 Theme *theme = themes+1;
-#define SHADOW 0
 #define PIECE_WIDTH 16
 #define CELL_WIDTH 20
 #define BOARD_WIDTH (CELL_WIDTH*8)
@@ -329,7 +332,7 @@ void drawPiece(u16 *img, u32 color, int x, int y){
         for (int i = 0; i < PIECE_WIDTH; i++)
             if (img[j] & (1<<i)){
                 frameBuffer[(y+j)*WIDTH + x+i] = color;
-                frameBuffer[(y+j+1)*WIDTH + x+i+1] = SHADOW;
+                frameBuffer[(y+j+1)*WIDTH + x+i+1] = theme->shadow;
             }
 }
 typedef enum GameType{gameNone,gameCPU,gameHuman}GameType;
@@ -347,8 +350,12 @@ typedef struct Button {
 Button *hoveredButton;
 void drawButton(Button *b){
     if (hoveredButton == b) fillRect(b->x, b->y, b->width, b->height, theme->hover);
-    int strpx = strlen(b->str)*6;
-    drawString(b->x+b->width/2-strpx/2, b->y+b->height/2-8/2, b->str);
+    int strpx = strlen(b->str)*GLYPH_WIDTH;
+    drawString(b->x+b->width/2-strpx/2, b->y+b->height/2-GLYPH_HEIGHT/2, b->str);
+}
+IVec2 getButtonCaretPos(Button *b){
+    int strpx = strlen(b->str)*GLYPH_WIDTH;
+    return (IVec2){b->x+b->width/2+strpx/2, b->y+b->height/2-GLYPH_HEIGHT/2};
 }
 #if _WIN32
 #undef UNICODE
@@ -412,7 +419,7 @@ void newRoom();
 void menuToJoin();
 void selectCode();
 void joinRoom();
-void backToMenu();
+void back();
 void decTheme();
 void incTheme();
 #define CHARPOS(x,y) BOARD_WIDTH+(x)*GLYPH_WIDTH, (y)*(GLYPH_HEIGHT+2)+1
@@ -431,7 +438,7 @@ Button buttonsCPU[]={
     SELECTOR(3,"Minutes:",minutesStr,decMinutes,incMinutes)
     SELECTOR(6,"CPU Lvl:",cpuLvlStr,decCpuLvl,incCpuLvl)
     LABEL(9,"Play",playCPU)
-    LABEL(11,"Back to menu",backToMenu)
+    LABEL(11,"Back",back)
 };
 u8 roomCode[9];
 Button buttonsRoom[]={
@@ -439,12 +446,13 @@ Button buttonsRoom[]={
     LABEL(4,roomCode,NULL)
     SELECTOR(6,"Minutes:",minutesStr,decMinutes,incMinutes)
     LABEL(9,"Play",NULL)
-    LABEL(11,"Back to menu",backToMenu)
+    LABEL(11,"Back",back)
 };
 Button buttonsCode[]={
     LABEL(6,"Enter Code:",NULL)
     LABEL(7,roomCode,selectCode)
     LABEL(9,"Join",joinRoom)
+    LABEL(11,"Back",back)
 };
 typedef struct Menu {
     Button *buttons;
@@ -497,11 +505,11 @@ void selectCode(){
     codeSelected = TRUE;
 }
 void menuToJoin(){
-    sprintf(roomCode,"penis");
+    sprintf(roomCode,"poop");
     menu = menus + 3;
     DRAW();
 }
-void backToMenu(){
+void back(){
     menu = menus;
     game.t = gameNone;
 }
@@ -582,7 +590,14 @@ LONG WINAPI WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam){
             if (piece(c)) drawPiece(pieceImgs[piece(c)-1], theme->piece[side(c)], scrX*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2, scrY*CELL_WIDTH+(CELL_WIDTH-PIECE_WIDTH)/2);
         }
     }
-    if (menu == (menus+3)) fillRect(CHARPOS(0,7),RIGHT_PANEL_WIDTH,GLYPH_HEIGHT,0);
+    if (menu == (menus+3)){
+        Button *b = menu->buttons+1;
+        fillRect(b->x,b->y,b->width,b->height,theme->shadow);
+        if (codeSelected){
+            IVec2 v = getButtonCaretPos(menu->buttons+1);
+            fillRect(v.x+1,v.y,1,GLYPH_HEIGHT,theme->text);
+        }
+    }
     for (int i = 0; i < menu->buttonCount; i++) drawButton(menu->buttons+i);
 #if _WIN32
     StretchDIBits(hdc, 0,0, WND_WIDTH,WND_HEIGHT, 0,0,WIDTH,HEIGHT,frameBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
