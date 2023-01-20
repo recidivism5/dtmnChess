@@ -40,14 +40,9 @@ int main(){
         format.dwChannelMask = 0;
     }
     UINT16 formatTag = EXTRACT_WAVEFORMATEX_ID(&format.SubFormat);
-    switch(formatTag){
-        case WAVE_FORMAT_IEEE_FLOAT:
-            puts("WAVE_FORMAT_IEEE_FLOAT");
-            break;
-        case WAVE_FORMAT_PCM:
-            puts("WAVE_FORMAT_PCM");
-            break;
-        puts("Unknown Wave Format");
+    if (formatTag != WAVE_FORMAT_IEEE_FLOAT){
+        puts("Error: Unsupported MixFormat");
+        goto EXIT;
     }
     pAudioClient->lpVtbl->GetBufferSize(pAudioClient,&bufferFrameCount);
     pAudioClient->lpVtbl->GetService(pAudioClient,&IID_IAudioRenderClient,&pRenderClient);
@@ -56,13 +51,14 @@ int main(){
     for(UINT32 i = 0; i < bufferFrameCount; i++){
         for (int j = 0; j < format.Format.nChannels; j++)
             d[i*format.Format.nChannels + j] = sinf(rad);
-        rad += 432 * 2 * M_PI / format.Format.nSamplesPerSec;
+        rad += 1200 * 2 * M_PI / format.Format.nSamplesPerSec;
     }
     pRenderClient->lpVtbl->ReleaseBuffer(pRenderClient,bufferFrameCount,flags);
     hnsActualDuration = (double)REFTIMES_PER_SEC * bufferFrameCount / pwfx->nSamplesPerSec;
     pAudioClient->lpVtbl->Start(pAudioClient);
     Sleep(hnsActualDuration / REFTIMES_PER_MILLISEC / 2);
     pAudioClient->lpVtbl->Stop(pAudioClient);
+    EXIT:
     CoTaskMemFree(pwfx);
     pEnumerator->lpVtbl->Release(pEnumerator);
     pDevice->lpVtbl->Release(pDevice);
