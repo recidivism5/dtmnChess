@@ -33,11 +33,8 @@ int main(){
     WAVEFORMATEXTENSIBLE format;
     if (pwfx->wFormatTag == WAVE_FORMAT_EXTENSIBLE) format = *(WAVEFORMATEXTENSIBLE*)pwfx;
     else{
-        format.Format = *pwfx;
-        format.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
-        INIT_WAVEFORMATEX_GUID(&format.SubFormat, pwfx->wFormatTag);
-        format.Samples.wValidBitsPerSample = format.Format.wBitsPerSample;
-        format.dwChannelMask = 0;
+        puts("Error: Unsupported MixFormat");
+        goto EXIT;
     }
     UINT16 formatTag = EXTRACT_WAVEFORMATEX_ID(&format.SubFormat);
     if (formatTag != WAVE_FORMAT_IEEE_FLOAT){
