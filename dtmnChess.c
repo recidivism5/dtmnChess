@@ -287,7 +287,7 @@ Theme themes[]={
     "Gween",0xbeb6a8,0x3c673b,0xeae4db,0x458245,0,0x3c673b,0x4f884e,0xbeb6a8,
     "Bee",0xbcaf00,0x343001,0xf0dc00,0x474100,0,0x343001,0x685f00,0xf0dc00,
 };
-Theme *theme = themes;
+Theme *theme = themes+2;
 #define PIECE_WIDTH 16
 #define CELL_WIDTH 20
 #define BOARD_WIDTH (CELL_WIDTH*8)
