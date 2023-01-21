@@ -82,7 +82,7 @@ int main(){
         if (pwfx->wBitsPerSample == 32){
             for (u32 i = 0; i < frameCount; i++){
                 for (u32 c = 0; c < pwfx->nChannels; c++){
-                    ((float*)pData)[i*pwfx->nChannels + c] = sound[i*8000/pwfx->nSamplesPerSec];
+                    ((float*)pData)[i*pwfx->nChannels + c] = (float)sound[i*8000/pwfx->nSamplesPerSec] / 127.0f;
                 }
             }
         } else {
