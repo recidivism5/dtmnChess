@@ -31,7 +31,7 @@ typedef enum Flag {
 }Flag;
 typedef struct Board {
     u8 flags; //turn, loRookMoved[2], hiRookMoved[2]
-    u32 arr[8];
+    u8 cells[64];
 }Board;
 bool getFlag(Board *b, Flag f){
     return !!(b->flags & f);
@@ -41,16 +41,16 @@ void setFlag(Board *b, Flag f, bool v){
     else b->flags &= ~f;
 }
 u8 cell(Side s, Piece p){
-    return s<<3 | p;
+    return s<<7 | p;
 }
 u8 getCell(Board *b, int x, int y){
-    return b->arr[y] >> (x*4) & 0xf;
+    return b->cells[y*8+x];
 }
 void setCell(Board *b, int x, int y, u8 c){
-    b->arr[y] = (b->arr[y] & ~(0xf << (x*4))) | (c << (x*4));
+    b->cells[y*8+x] = c;
 }
 Side side(u8 c){
-    return c >> 3;
+    return c >> 7;
 }
 u8 piece(u8 c){
     return c & 0b111;
