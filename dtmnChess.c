@@ -10,6 +10,7 @@ typedef int8_t i8;
 typedef int32_t i32;
 typedef i8 bool;
 typedef bool Side;
+u8 zero = 0;
 typedef struct IVec2 {
     int x,y;
 }IVec2;
@@ -385,19 +386,34 @@ id window;
 #define THREAD(func) pthread_t _pt; pthread_create(&_pt, NULL, func, NULL); pthread_detach(_pt)
 int sock;
 #endif
-int minutesOptions[]={1, 3, 5, 10};
-int *minutes = minutesOptions;
+u8 oppMinutes;
+int oppSeconds;
+char oppTimeStr[] = "Not Ready";
+int seconds;
+char timeStr[] = "Not Ready";
+bool ready;
+u8 minutesOptions[]={1, 3, 5, 10};
+u8 *minutes = minutesOptions;
 char minutesStr[3] = {'1',0,0};
+void setReady(){
+    ready = TRUE;
+    sprintf(timeStr,"%02d:%02d",*minutes,0);
+    DRAW();
+}
 void decMinutes(){
     if (minutes > minutesOptions){
         minutes--;
         sprintf(minutesStr, "%d", *minutes);
+        ready = FALSE;
+        sprintf(timeStr,"Not Ready");
     }
 }
 void incMinutes(){
     if (minutes < (minutesOptions+COUNT(minutesOptions)-1)){
         minutes++;
         sprintf(minutesStr, "%d", *minutes);
+        ready = FALSE;
+        sprintf(timeStr,"Not Ready");
     }
 }
 int cpuLvl = 5;
@@ -455,6 +471,12 @@ Button buttonsCode[]={
     LABEL(9,"Join",joinRoom)
     LABEL(11,"Back",back)
 };
+Button buttonsRoomGame[]={
+    LABEL(0,oppTimeStr,NULL)
+    SELECTOR(6,"Minutes:",minutesStr,decMinutes,incMinutes)
+    LABEL(9,"Ready",setReady)
+    LABEL(15,timeStr,NULL)
+};
 typedef struct Menu {
     Button *buttons;
     int buttonCount;
@@ -463,7 +485,8 @@ Menu menus[]={
     buttonsMain,COUNT(buttonsMain),
     buttonsCPU,COUNT(buttonsCPU),
     buttonsRoom,COUNT(buttonsRoom),
-    buttonsCode,COUNT(buttonsCode)
+    buttonsCode,COUNT(buttonsCode),
+    buttonsRoomGame,COUNT(buttonsRoomGame)
 };
 Menu *menu = menus;
 void menuToCPU(){
@@ -475,7 +498,7 @@ void playCPU(){
     game.s = rand() % 2;
     if (game.s) doMove(&game.b, bestMove(&game.b));
 }
-void getRoom(){
+void connectToServer(){
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2,2), &wsaData);
     struct addrinfo *result = NULL,
@@ -487,26 +510,49 @@ void getRoom(){
         closesocket(sock);
     }
     freeaddrinfo(result);
-    u8 zero = 0;
+}
+void preGame(){
+    while (1){
+        if (ready) send(sock, minutes, sizeof(*minutes), 0);
+        else send(sock, &zero, sizeof(zero), 0);
+        recv(sock, &oppMinutes, sizeof(oppMinutes), 0);
+        if (oppMinutes > 10) return;
+        if (oppMinutes){
+            oppSeconds = oppMinutes * 60;
+            sprintf(oppTimeStr, "%02d:%02d", oppMinutes, 0);
+        } else sprintf(oppTimeStr,"Not Ready");
+        menu = menus+4;
+        DRAW();
+    }
+}
+void newRoomT(){
+    connectToServer();
     send(sock, &zero, sizeof(zero), 0);
     roomCode[sizeof(roomCode)-1] = 0;
     recv(sock, roomCode, sizeof(roomCode)-1, 0);
     DRAW();
+    preGame();
 }
 void newRoom(){
     menu = menus+2;
     sprintf(roomCode, "...");
-    THREAD(getRoom);
+    THREAD(newRoomT);
+}
+void joinRoomT(){
+    connectToServer();
+    send(sock, roomCode, sizeof(roomCode)-1, 0);
+    preGame();
 }
 void joinRoom(){
-
+    menu = menus+4;
+    THREAD(joinRoomT);
 }
 bool codeSelected;
 void selectCode(){
     codeSelected = TRUE;
 }
 void menuToJoin(){
-    sprintf(roomCode,"poop");
+    sprintf(roomCode,"...");
     menu = menus + 3;
     DRAW();
 }

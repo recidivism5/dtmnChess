@@ -214,7 +214,7 @@ int getWin(Board *b){ //-1: in progress, 0: 0 won, 1: 1 won, 2: stalemate
 char port[]="6464";
 struct addrinfo hints = {AI_PASSIVE,AF_INET,SOCK_STREAM,IPPROTO_TCP};
 typedef struct Room {
-    u8 code[8];
+    u8 code[9];
     SOCKET socks[2];
 }Room;
 Room rooms[1024];
@@ -223,27 +223,30 @@ char codeSymbols[]="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx
 CRITICAL_SECTION lock;
 void handleClient(SOCKET *p){
     srand(time(NULL));
-    u8 code[8];
+    u8 code[9];
+    code[sizeof(code)-1] = 0;
     u8 zero = 0;
     if (recv(*p, code, 1, 0) < 1) goto EXC;
     if (code[0]){
-        if (recv(*p, code+1, sizeof(code)-1, 0) < 1) goto EXC;
+        if (recv(*p, code+1, sizeof(code)-2, 0) < 1) goto EXC;
         //pthread_mutex_lock(&lock);
         EnterCriticalSection(&lock);
+        printf("Client requesting room %s\n",code);
+        bool found = FALSE;
         for (int i = 0; i < COUNT(rooms); i++){
-            if (rooms[i].socks[0] && !rooms[i].socks[1]){
-                for (int j = 0; j < sizeof(code); j++) if (rooms[i].code[j] != code[j]) goto EX;
+            if (rooms[i].socks[0] && !rooms[i].socks[1] && !strcmp(rooms[i].code,code)){
+                found = TRUE;
+                printf("Room %s filled\n",code);
                 Room *r = rooms+i;
                 r->socks[1] = *p;
                 //pthread_mutex_unlock(&lock);
                 LeaveCriticalSection(&lock);
-                u8 one = 1;
-                FOR(j,2) if (send(r->socks[j], &one, 1, 0) < 1) goto CLOSE;
                 POLL:
                 u8 mins[2] = {0,0};
                 while (!(mins[0]==mins[1] && mins[0])){
                     FOR(j,2) if (recv(r->socks[j], mins+j, 1, 0) < 1) goto CLOSE;
                     FOR(j,2) if (send(r->socks[1-j], mins+j, 1, 0) < 1) goto CLOSE;
+                    Sleep(500);
                 }
                 FOR(j,2) if (recv(r->socks[j], mins, 1, 0) < 1) goto CLOSE;
                 u8 side = rand() % 2;
@@ -270,16 +273,23 @@ void handleClient(SOCKET *p){
                 r->socks[1] = 0;
                 goto EXC;
             }
+        } if (!found){
+            puts("Room not found.");
+            goto EX;
         }
     } else {
-        FOR(i,sizeof(code)) code[i] = codeSymbols[rand() % (COUNT(codeSymbols)-1)];
-        if (send(*p, code, sizeof(code), 0) < 1) goto EXC;
         //pthread_mutex_lock(&lock);
         EnterCriticalSection(&lock);
         for (int i = 0; i < COUNT(rooms); i++){
             if (!rooms[i].socks[0]){
+                FOR(i,sizeof(code)-1) code[i] = codeSymbols[rand() % (COUNT(codeSymbols)-1)];
+                if (send(*p, code, sizeof(code)-1, 0) < 1) goto EXC;
+                printf("New room %s\n",code);
                 Room *r = rooms+i;
                 r->socks[0] = *p;
+                r->socks[1] = 0;
+                memcpy(r->code,code,sizeof(code)-1);
+                printf("SOCKAFTER: %lld\n",r->socks[0]);
                 //pthread_mutex_unlock(&lock);
                 LeaveCriticalSection(&lock);
                 free(p); //socket sitting in room will eventually time out. what to do about that? I think we'll just keep this thread alive and talk to it every 10 seconds
